@@ -1,0 +1,6 @@
+{
+  "name": "ZAYRO Collection",
+  "description": "Minimalist luxury menswear collection featuring precision tailoring, editorial aesthetics, and architectural design.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
