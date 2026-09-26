@@ -10,12 +10,25 @@ function json(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
-function readBody(req: IncomingMessage): Promise<string> {
+function readBody(req: IncomingMessage & { body?: unknown }): Promise<string> {
+  if (req.body != null) {
+    return Promise.resolve(typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
+  }
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
+    let settled = false;
+    const finish = (value: string) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
     req.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('end', () => finish(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
+    // Vercel may have already ended an empty stream.
+    if ((req as { readableEnded?: boolean }).readableEnded) {
+      finish('');
+    }
   });
 }
 

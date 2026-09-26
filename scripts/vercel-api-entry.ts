@@ -9,7 +9,17 @@ import { handleReviewApi } from '../server/reviewApi';
 import { handleShopApi } from '../server/shopApi';
 import { handleStripeApi } from '../server/stripeHandler';
 
-type ApiReq = IncomingMessage & { query?: Record<string, string | string[] | undefined>; url?: string };
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+type ApiReq = IncomingMessage & {
+  query?: Record<string, string | string[] | undefined>;
+  url?: string;
+  body?: unknown;
+};
 type ApiRes = ServerResponse;
 
 function json(res: ApiRes, status: number, body: unknown) {

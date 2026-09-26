@@ -976,6 +976,7 @@ var init_orderStore = __esm({
 // scripts/vercel-api-entry.ts
 var vercel_api_entry_exports = {};
 __export(vercel_api_entry_exports, {
+  config: () => config,
   default: () => handler
 });
 module.exports = __toCommonJS(vercel_api_entry_exports);
@@ -3375,11 +3376,23 @@ function json7(res, status, body) {
   res.end(JSON.stringify(body));
 }
 function readBody7(req) {
+  if (req.body != null) {
+    return Promise.resolve(typeof req.body === "string" ? req.body : JSON.stringify(req.body));
+  }
   return new Promise((resolve, reject) => {
     const chunks = [];
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
     req.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("end", () => finish(Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
+    if (req.readableEnded) {
+      finish("");
+    }
   });
 }
 function str5(value) {
@@ -3598,6 +3611,11 @@ async function handleInner2(req, res) {
 
 // scripts/vercel-api-entry.ts
 init_stripeHandler();
+var config = {
+  api: {
+    bodyParser: false
+  }
+};
 function json8(res, status, body) {
   if (res.headersSent) return;
   res.statusCode = status;
@@ -3672,3 +3690,7 @@ async function handler(req, res) {
     });
   }
 }
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  config
+});
