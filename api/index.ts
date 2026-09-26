@@ -1,4 +1,4 @@
-import type { IncomingMessage, ServerResponse } from 'http';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleAdminOrderApi, isAdminOrderApi } from '../server/adminOrderApi';
 import { handleChatApi, isChatApi } from '../server/chatApi';
 import { handleOrderCallApi, isOrderCallApi } from '../server/confirmationCallHandler';
@@ -16,54 +16,76 @@ export const config = {
   maxDuration: 30,
 };
 
-function json(res: ServerResponse, status: number, body: unknown) {
+function json(res: VercelResponse, status: number, body: unknown) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(body));
 }
 
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  const url = (req.url || '').split('?')[0] || '';
+function resolveApiPath(req: VercelRequest): string {
+  const fromQuery = req.query.__path;
+  if (typeof fromQuery === 'string' && fromQuery.trim()) {
+    return `/api/${fromQuery.replace(/^\/+/, '')}`;
+  }
+  if (Array.isArray(fromQuery) && fromQuery[0]) {
+    return `/api/${String(fromQuery[0]).replace(/^\/+/, '')}`;
+  }
+
+  const raw = (req.url || '').split('?')[0] || '';
+  if (raw.startsWith('/api/') && raw !== '/api' && raw !== '/api/index') {
+    return raw;
+  }
+
+  return raw.startsWith('/api') ? raw : `/api${raw}`;
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const urlPath = resolveApiPath(req);
+  const search = (req.url || '').includes('?')
+    ? (req.url || '').slice((req.url || '').indexOf('?'))
+    : '';
+  // Existing Node handlers read req.url / req.method.
+  (req as { url?: string }).url = `${urlPath}${search.replace(/([?&])__path=[^&]*/g, '').replace(/\?&/, '?').replace(/\?$/, '')}`;
 
   try {
-    if (url === '/api/ipinfo') {
+    if (urlPath === '/api/ipinfo') {
       await handleIpinfoRequest(req, res);
       return;
     }
-    if (isStripeApi(url)) {
+    if (isStripeApi(urlPath)) {
       await handleStripeApi(req, res);
       return;
     }
-    if (isAdminOrderApi(url)) {
+    if (isAdminOrderApi(urlPath)) {
       await handleAdminOrderApi(req, res);
       return;
     }
-    if (isReviewApi(url)) {
+    if (isReviewApi(urlPath)) {
       await handleReviewApi(req, res);
       return;
     }
-    if (isShopApi(url)) {
+    if (isShopApi(urlPath)) {
       await handleShopApi(req, res);
       return;
     }
-    if (isReturnRequestApi(url)) {
+    if (isReturnRequestApi(urlPath)) {
       await handleReturnRequestApi(req, res);
       return;
     }
-    if (isOrderCallApi(url)) {
+    if (isOrderCallApi(urlPath)) {
       await handleOrderCallApi(req, res);
       return;
     }
-    if (isMongoHealthApi(url)) {
+    if (isMongoHealthApi(urlPath)) {
       await handleMongoHealth(req, res);
       return;
     }
-    if (isChatApi(url)) {
+    if (isChatApi(urlPath)) {
       await handleChatApi(req, res);
       return;
     }
 
-    json(res, 404, { error: 'Not found' });
+    json(res, 404, { error: `API route not found: ${urlPath}` });
   } catch (error) {
     if (!res.headersSent) {
       json(res, 500, {
