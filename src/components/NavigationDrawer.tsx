@@ -17,6 +17,7 @@ import { ViewScreen } from '../types';
 import { useI18n } from '../i18n/LanguageContext';
 import { MessageKey } from '../i18n/languages';
 import { LanguageSelector } from './LanguageSelector';
+import { ThemeToggle } from './ThemeToggle';
 
 interface NavigationDrawerProps {
   isOpen: boolean;
@@ -229,8 +230,9 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
             </span>
           </button>
 
-          <div className="px-2 py-2 border border-[#cfc4c5]/40 bg-white">
+          <div className="px-2 py-2 border border-[#cfc4c5]/40 bg-white flex items-center justify-between gap-2">
             <LanguageSelector />
+            <ThemeToggle />
           </div>
 
           <div className="pt-4 text-[11px] text-[#5d5f5f] tracking-wide">
