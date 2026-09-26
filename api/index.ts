@@ -1,4 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { handleAdminOrderApi } from '../server/adminOrderApi';
+import { handleChatApi } from '../server/chatApi';
+import { handleOrderCallApi } from '../server/confirmationCallHandler';
+import { handleIpinfoRequest } from '../server/ipinfoLookup';
+import { handleMongoHealth } from '../server/mongoHealth';
+import { handleReturnRequestApi } from '../server/returnRequestHandler';
+import { handleReviewApi } from '../server/reviewApi';
+import { handleShopApi } from '../server/shopApi';
+import { handleStripeApi } from '../server/stripeHandler';
 
 export const config = {
   api: {
@@ -47,55 +56,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (urlPath === '/api/ipinfo') {
-      const { handleIpinfoRequest } = await import('../server/ipinfoLookup');
       await handleIpinfoRequest(req, res);
       return;
     }
-
     if (urlPath.startsWith('/api/stripe')) {
-      const { handleStripeApi } = await import('../server/stripeHandler');
       await handleStripeApi(req, res);
       return;
     }
-
     if (urlPath.startsWith('/api/admin')) {
-      const { handleAdminOrderApi } = await import('../server/adminOrderApi');
       await handleAdminOrderApi(req, res);
       return;
     }
-
     if (urlPath.startsWith('/api/reviews')) {
-      const { handleReviewApi } = await import('../server/reviewApi');
       await handleReviewApi(req, res);
       return;
     }
-
     if (urlPath.startsWith('/api/auth') || urlPath.startsWith('/api/shop')) {
-      const { handleShopApi } = await import('../server/shopApi');
       await handleShopApi(req, res);
       return;
     }
-
     if (urlPath.startsWith('/api/returns')) {
-      const { handleReturnRequestApi } = await import('../server/returnRequestHandler');
       await handleReturnRequestApi(req, res);
       return;
     }
-
     if (urlPath.startsWith('/api/order-call') || urlPath.includes('confirmation')) {
-      const { handleOrderCallApi } = await import('../server/confirmationCallHandler');
       await handleOrderCallApi(req, res);
       return;
     }
-
     if (urlPath.startsWith('/api/mongo')) {
-      const { handleMongoHealth } = await import('../server/mongoHealth');
       await handleMongoHealth(req, res);
       return;
     }
-
     if (urlPath.startsWith('/api/chat')) {
-      const { handleChatApi } = await import('../server/chatApi');
       await handleChatApi(req, res);
       return;
     }
@@ -104,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     json(res, 500, {
       error: error instanceof Error ? error.message : 'Server error',
-      stack: error instanceof Error ? error.stack?.split('\n').slice(0, 6) : undefined,
+      stack: error instanceof Error ? error.stack?.split('\n').slice(0, 8) : undefined,
     });
   }
 }

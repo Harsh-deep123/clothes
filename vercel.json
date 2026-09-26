@@ -8,8 +8,9 @@
   ],
   "functions": {
     "api/index.ts": {
-      "includeFiles": "server/**",
-      "maxDuration": 30
+      "includeFiles": "server/**/*",
+      "maxDuration": 30,
+      "memory": 1024
     }
   }
 }
