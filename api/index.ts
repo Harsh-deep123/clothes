@@ -1,13 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { handleAdminOrderApi, isAdminOrderApi } from '../server/adminOrderApi';
-import { handleChatApi, isChatApi } from '../server/chatApi';
-import { handleOrderCallApi, isOrderCallApi } from '../server/confirmationCallHandler';
-import { handleIpinfoRequest } from '../server/ipinfoLookup';
-import { handleMongoHealth, isMongoHealthApi } from '../server/mongoHealth';
-import { handleReturnRequestApi, isReturnRequestApi } from '../server/returnRequestHandler';
-import { handleReviewApi, isReviewApi } from '../server/reviewApi';
-import { handleShopApi, isShopApi } from '../server/shopApi';
-import { handleStripeApi, isStripeApi } from '../server/stripeHandler';
 
 export const config = {
   api: {
@@ -17,6 +8,7 @@ export const config = {
 };
 
 function json(res: VercelResponse, status: number, body: unknown) {
+  if (res.headersSent) return;
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(body));
@@ -32,65 +24,87 @@ function resolveApiPath(req: VercelRequest): string {
   }
 
   const raw = (req.url || '').split('?')[0] || '';
-  if (raw.startsWith('/api/') && raw !== '/api' && raw !== '/api/index') {
+  if (raw.startsWith('/api/') && raw !== '/api' && !raw.endsWith('/index')) {
     return raw;
   }
-
   return raw.startsWith('/api') ? raw : `/api${raw}`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const urlPath = resolveApiPath(req);
-  const search = (req.url || '').includes('?')
-    ? (req.url || '').slice((req.url || '').indexOf('?'))
-    : '';
-  // Existing Node handlers read req.url / req.method.
-  (req as { url?: string }).url = `${urlPath}${search.replace(/([?&])__path=[^&]*/g, '').replace(/\?&/, '?').replace(/\?$/, '')}`;
-
   try {
+    const urlPath = resolveApiPath(req);
+    const rawUrl = req.url || '';
+    const search = rawUrl.includes('?') ? rawUrl.slice(rawUrl.indexOf('?')) : '';
+    const cleanedSearch = search
+      .replace(/[?&]__path=[^&]*/g, '')
+      .replace(/^\?&/, '?')
+      .replace(/^\?$/, '');
+    (req as { url?: string }).url = `${urlPath}${cleanedSearch}`;
+
+    if (urlPath === '/api/health') {
+      json(res, 200, { ok: true, path: urlPath });
+      return;
+    }
+
     if (urlPath === '/api/ipinfo') {
+      const { handleIpinfoRequest } = await import('../server/ipinfoLookup');
       await handleIpinfoRequest(req, res);
       return;
     }
-    if (isStripeApi(urlPath)) {
+
+    if (urlPath.startsWith('/api/stripe')) {
+      const { handleStripeApi } = await import('../server/stripeHandler');
       await handleStripeApi(req, res);
       return;
     }
-    if (isAdminOrderApi(urlPath)) {
+
+    if (urlPath.startsWith('/api/admin')) {
+      const { handleAdminOrderApi } = await import('../server/adminOrderApi');
       await handleAdminOrderApi(req, res);
       return;
     }
-    if (isReviewApi(urlPath)) {
+
+    if (urlPath.startsWith('/api/reviews')) {
+      const { handleReviewApi } = await import('../server/reviewApi');
       await handleReviewApi(req, res);
       return;
     }
-    if (isShopApi(urlPath)) {
+
+    if (urlPath.startsWith('/api/auth') || urlPath.startsWith('/api/shop')) {
+      const { handleShopApi } = await import('../server/shopApi');
       await handleShopApi(req, res);
       return;
     }
-    if (isReturnRequestApi(urlPath)) {
+
+    if (urlPath.startsWith('/api/returns')) {
+      const { handleReturnRequestApi } = await import('../server/returnRequestHandler');
       await handleReturnRequestApi(req, res);
       return;
     }
-    if (isOrderCallApi(urlPath)) {
+
+    if (urlPath.startsWith('/api/order-call') || urlPath.includes('confirmation')) {
+      const { handleOrderCallApi } = await import('../server/confirmationCallHandler');
       await handleOrderCallApi(req, res);
       return;
     }
-    if (isMongoHealthApi(urlPath)) {
+
+    if (urlPath.startsWith('/api/mongo')) {
+      const { handleMongoHealth } = await import('../server/mongoHealth');
       await handleMongoHealth(req, res);
       return;
     }
-    if (isChatApi(urlPath)) {
+
+    if (urlPath.startsWith('/api/chat')) {
+      const { handleChatApi } = await import('../server/chatApi');
       await handleChatApi(req, res);
       return;
     }
 
     json(res, 404, { error: `API route not found: ${urlPath}` });
   } catch (error) {
-    if (!res.headersSent) {
-      json(res, 500, {
-        error: error instanceof Error ? error.message : 'Server error',
-      });
-    }
+    json(res, 500, {
+      error: error instanceof Error ? error.message : 'Server error',
+      stack: error instanceof Error ? error.stack?.split('\n').slice(0, 6) : undefined,
+    });
   }
 }
