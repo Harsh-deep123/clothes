@@ -55,8 +55,8 @@ export const Header: React.FC<HeaderProps> = ({
         scrolled ? 'zayro-header-scrolled' : ''
       }`}
     >
-      <div className="flex justify-between items-center px-5 md:px-16 h-20 w-full max-w-[1440px] mx-auto">
-        <div className="flex items-center -ml-2 min-w-[72px] md:min-w-[120px]">
+      <div className="relative flex justify-between items-center px-4 sm:px-5 md:px-16 h-20 w-full max-w-[1440px] mx-auto">
+        <div className="relative z-20 flex items-center -ml-1 sm:-ml-2 min-w-[40px] md:min-w-[120px]">
           <button
             id="menu-btn"
             aria-label={t('nav.menu')}
@@ -70,13 +70,13 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           id="brand-logo-btn"
           onClick={() => onNavigate('home')}
-          className="font-serif-luxury text-2xl md:text-3xl font-normal tracking-tight text-[#1a1c1c] hover:opacity-80 transition-opacity duration-300 cursor-pointer text-center"
+          className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 font-serif-luxury text-2xl md:text-3xl font-normal tracking-tight text-[#1a1c1c] hover:opacity-80 transition-opacity duration-300 cursor-pointer text-center whitespace-nowrap pointer-events-auto"
         >
           ZAYRO
         </button>
 
-        <div className="flex items-center justify-end -mr-2 min-w-[72px] md:min-w-[260px]">
-          <div className="relative group">
+        <div className="relative z-20 flex items-center justify-end -mr-1 sm:-mr-2 min-w-[40px] md:min-w-[260px]">
+          <div className="relative group hidden md:block">
             <div
               className="flex items-center gap-1.5 text-[#1a1c1c] px-1.5 py-2 cursor-default"
               title={`Current Location: ${deliveryCity || 'Not set'}`}
@@ -90,13 +90,15 @@ export const Header: React.FC<HeaderProps> = ({
               Current Location: {deliveryCity || 'Not set'}
             </div>
           </div>
-          <LanguageSelector />
+          <div className="hidden md:block">
+            <LanguageSelector />
+          </div>
           <ThemeToggle />
           <button
             type="button"
             aria-label={t('nav.search')}
             onClick={onOpenSearch}
-            className="zayro-icon-btn relative text-[#1a1c1c] hover:opacity-70 p-2 cursor-pointer flex items-center justify-center"
+            className="zayro-icon-btn relative text-[#1a1c1c] hover:opacity-70 p-1.5 sm:p-2 cursor-pointer flex items-center justify-center"
           >
             <Search className="w-6 h-6 stroke-[1.5]" />
           </button>
@@ -104,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             aria-label={t('nav.account')}
             onClick={onAccountClick}
-            className="zayro-icon-btn relative text-[#1a1c1c] hover:opacity-70 p-2 cursor-pointer flex items-center justify-center"
+            className="zayro-icon-btn relative text-[#1a1c1c] hover:opacity-70 p-1.5 sm:p-2 cursor-pointer flex items-center justify-center"
           >
             <User className="w-6 h-6 stroke-[1.5]" />
           </button>
@@ -112,7 +114,7 @@ export const Header: React.FC<HeaderProps> = ({
             id="cart-btn"
             aria-label={t('nav.bag')}
             onClick={onOpenCart}
-            className="zayro-icon-btn relative text-[#1a1c1c] hover:opacity-70 p-2 cursor-pointer flex items-center justify-center"
+            className="zayro-icon-btn relative text-[#1a1c1c] hover:opacity-70 p-1.5 sm:p-2 cursor-pointer flex items-center justify-center"
           >
             <ShoppingBag className="w-6 h-6 stroke-[1.5]" />
             {cartCount > 0 && (

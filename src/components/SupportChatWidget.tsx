@@ -160,7 +160,7 @@ export const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({
     <div className="zayro-support-chat fixed z-[90] bottom-5 left-5 md:bottom-6 md:left-6 flex flex-col items-start gap-3">
       {open && (
         <section
-          className="zayro-support-panel w-[min(100vw-2.5rem,380px)] h-[min(72vh,560px)] bg-white border border-[#cfc4c5]/40 shadow-2xl flex flex-col overflow-hidden"
+          className="zayro-support-panel w-[min(100vw-2.5rem,320px)] h-[min(52vh,420px)] md:w-[min(100vw-2.5rem,380px)] md:h-[min(72vh,560px)] bg-white border border-[#cfc4c5]/40 shadow-2xl flex flex-col overflow-hidden"
           aria-label="ZAYRO support chat"
         >
           <header className="flex items-center gap-2 px-3 py-3 border-b border-[#cfc4c5]/30 bg-white shrink-0">

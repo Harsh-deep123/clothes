@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'http';
 import { bearerToken, signAuthToken, verifyAuthToken } from './jwt';
 import { seedProductsCollection, createShopOrder, getOrderByOrderId, listOrdersForUser, normalizeDeliveryLocation } from './shopOrders';
 import { sendRegistrationOtp, verifyRegistrationOtp } from './otpStore';
-import { findUserById, updateUserProfile, verifyUser } from './userStore';
+import { createUser, findUserById, updateUserProfile, verifyUser } from './userStore';
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status;
@@ -88,8 +88,25 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
   }
 
   if (url === '/api/auth/register' && method === 'POST') {
-    json(res, 403, {
-      error: 'Phone verification is required. Request an OTP, then verify it to create your account.',
+    const payload = JSON.parse((await readBody(req)) || '{}') as Record<string, unknown>;
+    const result = await createUser({
+      fullName: str(payload.fullName),
+      email: str(payload.email),
+      phone: str(payload.phone),
+      password: typeof payload.password === 'string' ? payload.password : '',
+      shippingAddress: str(payload.shippingAddress),
+      city: str(payload.city),
+      state: str(payload.state),
+      country: str(payload.country),
+      postalCode: str(payload.postalCode),
+    });
+    if ('error' in result) {
+      json(res, result.status, { error: result.error });
+      return;
+    }
+    json(res, 201, {
+      user: result.user,
+      token: signAuthToken({ userId: result.user.id, email: result.user.email }),
     });
     return;
   }

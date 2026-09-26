@@ -308,8 +308,8 @@ export const AccountPage: React.FC<AccountPageProps> = ({
             <div className="space-y-6 max-w-lg">
               <h2 className="font-serif-luxury text-2xl">Account Settings</h2>
               <p className="text-sm text-[#5d5f5f] font-light leading-relaxed">
-                This account exists only in your browser storage. Signing out clears the session on this device. It does
-                not delete your saved profile unless you choose to.
+                Your account is stored in our database. Signing out only clears the session on this device — your profile
+                stays saved for the next login.
               </p>
               <button
                 type="button"

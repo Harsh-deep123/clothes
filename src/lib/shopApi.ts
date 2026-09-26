@@ -42,6 +42,33 @@ function authHeaders() {
   };
 }
 
+function errorMessage(data: unknown, fallback: string): string {
+  if (!data || typeof data !== 'object') return fallback;
+  const err = (data as { error?: unknown }).error;
+  if (typeof err === 'string' && err.trim()) return err.trim();
+  if (err && typeof err === 'object') {
+    const nested = (err as { message?: unknown }).message;
+    if (typeof nested === 'string' && nested.trim()) return nested.trim();
+  }
+  const message = (data as { message?: unknown }).message;
+  if (typeof message === 'string' && message.trim()) return message.trim();
+  return fallback;
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(
+      response.ok
+        ? 'Invalid server response.'
+        : `Server unavailable (${response.status}). Account API is offline on this host.`
+    );
+  }
+}
+
 export function toLocalAccount(user: PublicUser): LocalAccount {
   return {
     id: user.id,
@@ -63,9 +90,11 @@ export async function apiSendOtp(account: LocalAccount) {
       password: account.password,
     }),
   });
-  const data = (await response.json()) as { maskedPhone?: string; error?: string };
-  if (!response.ok || !data.maskedPhone) throw new Error(data.error || 'Could not send OTP.');
-  return data.maskedPhone;
+  const data = await readJson(response);
+  if (!response.ok || !(data as { maskedPhone?: string }).maskedPhone) {
+    throw new Error(errorMessage(data, 'Could not send OTP.'));
+  }
+  return (data as { maskedPhone: string }).maskedPhone;
 }
 
 export async function apiVerifyOtp(account: Pick<LocalAccount, 'email' | 'phone'>, otp: string) {
@@ -78,16 +107,37 @@ export async function apiVerifyOtp(account: Pick<LocalAccount, 'email' | 'phone'
       otp,
     }),
   });
-  const data = (await response.json()) as { user?: PublicUser; token?: string; error?: string };
-  if (!response.ok || !data.user || !data.token) throw new Error(data.error || 'Could not verify OTP.');
+  const data = (await readJson(response)) as { user?: PublicUser; token?: string };
+  if (!response.ok || !data.user || !data.token) {
+    throw new Error(errorMessage(data, 'Could not verify OTP.'));
+  }
+  setAuthToken(data.token);
+  return data.user;
+}
+
+export async function apiRegister(account: LocalAccount) {
+  const response = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      fullName: account.fullName,
+      email: account.email,
+      phone: account.phone,
+      password: account.password,
+    }),
+  });
+  const data = (await readJson(response)) as { user?: PublicUser; token?: string };
+  if (!response.ok || !data.user || !data.token) {
+    throw new Error(errorMessage(data, 'Could not create account.'));
+  }
   setAuthToken(data.token);
   return data.user;
 }
 
 export async function apiMe() {
   const response = await fetch('/api/auth/me', { headers: authHeaders() });
-  const data = (await response.json()) as { user?: PublicUser; error?: string };
-  if (!response.ok || !data.user) throw new Error(data.error || 'Sign in required.');
+  const data = (await readJson(response)) as { user?: PublicUser };
+  if (!response.ok || !data.user) throw new Error(errorMessage(data, 'Sign in required.'));
   return data.user;
 }
 
@@ -97,9 +147,9 @@ export async function apiLogin(email: string, password: string) {
     headers: authHeaders(),
     body: JSON.stringify({ email, password }),
   });
-  const data = (await response.json()) as { user?: PublicUser; token?: string; error?: string };
+  const data = (await readJson(response)) as { user?: PublicUser; token?: string };
   if (!response.ok || !data.user || !data.token) {
-    throw new Error(data.error || 'Could not sign in.');
+    throw new Error(errorMessage(data, 'Could not sign in.'));
   }
   setAuthToken(data.token);
   return data.user;
@@ -119,8 +169,8 @@ export async function apiUpdateProfile(patch: {
     headers: authHeaders(),
     body: JSON.stringify(patch),
   });
-  const data = (await response.json()) as { user?: PublicUser; error?: string };
-  if (!response.ok || !data.user) throw new Error(data.error || 'Could not update profile.');
+  const data = (await readJson(response)) as { user?: PublicUser };
+  if (!response.ok || !data.user) throw new Error(errorMessage(data, 'Could not update profile.'));
   return data.user;
 }
 
@@ -157,8 +207,8 @@ export async function apiCreateOrder(payload: {
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
-  const data = (await response.json()) as { order?: { id: string; number: string; orderId?: string; createdAt: string }; error?: string };
-  if (!response.ok || !data.order) throw new Error(data.error || 'Could not save order.');
+  const data = (await readJson(response)) as { order?: { id: string; number: string; orderId?: string; createdAt: string } };
+  if (!response.ok || !data.order) throw new Error(errorMessage(data, 'Could not save order.'));
   return data.order;
 }
 
@@ -248,14 +298,14 @@ export function mapStoredToPlaced(order: Record<string, unknown>): PlacedOrder {
 
 export async function apiMyOrders(): Promise<PlacedOrder[]> {
   const response = await fetch('/api/shop/orders', { headers: authHeaders() });
-  const data = (await response.json()) as { orders?: Record<string, unknown>[]; error?: string };
-  if (!response.ok) throw new Error(data.error || 'Could not load orders.');
+  const data = (await readJson(response)) as { orders?: Record<string, unknown>[] };
+  if (!response.ok) throw new Error(errorMessage(data, 'Could not load orders.'));
   return (data.orders || []).map((order) => mapStoredToPlaced(order));
 }
 
 export async function apiGetOrderTracking(orderId: string) {
   const response = await fetch(`/api/shop/orders/${encodeURIComponent(orderId)}/tracking`, { headers: authHeaders() });
-  const data = (await response.json()) as { order?: Record<string, unknown>; error?: string };
-  if (!response.ok || !data.order) throw new Error(data.error || 'Order not found.');
+  const data = (await readJson(response)) as { order?: Record<string, unknown> };
+  if (!response.ok || !data.order) throw new Error(errorMessage(data, 'Order not found.'));
   return mapStoredToPlaced(data.order);
 }
