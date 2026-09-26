@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { IncomingMessage, ServerResponse } from 'http';
 import { handleAdminOrderApi } from '../server/adminOrderApi';
 import { handleChatApi } from '../server/chatApi';
 import { handleOrderCallApi } from '../server/confirmationCallHandler';
@@ -9,22 +9,18 @@ import { handleReviewApi } from '../server/reviewApi';
 import { handleShopApi } from '../server/shopApi';
 import { handleStripeApi } from '../server/stripeHandler';
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-  maxDuration: 30,
-};
+type ApiReq = IncomingMessage & { query?: Record<string, string | string[] | undefined>; url?: string };
+type ApiRes = ServerResponse;
 
-function json(res: VercelResponse, status: number, body: unknown) {
+function json(res: ApiRes, status: number, body: unknown) {
   if (res.headersSent) return;
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(body));
 }
 
-function resolveApiPath(req: VercelRequest): string {
-  const fromQuery = req.query.__path;
+function resolveApiPath(req: ApiReq): string {
+  const fromQuery = req.query?.__path;
   if (typeof fromQuery === 'string' && fromQuery.trim()) {
     return `/api/${fromQuery.replace(/^\/+/, '')}`;
   }
@@ -39,7 +35,7 @@ function resolveApiPath(req: VercelRequest): string {
   return raw.startsWith('/api') ? raw : `/api${raw}`;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: ApiReq, res: ApiRes) {
   try {
     const urlPath = resolveApiPath(req);
     const rawUrl = req.url || '';
@@ -48,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .replace(/[?&]__path=[^&]*/g, '')
       .replace(/^\?&/, '?')
       .replace(/^\?$/, '');
-    (req as { url?: string }).url = `${urlPath}${cleanedSearch}`;
+    req.url = `${urlPath}${cleanedSearch}`;
 
     if (urlPath === '/api/health') {
       json(res, 200, { ok: true, path: urlPath });
@@ -96,7 +92,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     json(res, 500, {
       error: error instanceof Error ? error.message : 'Server error',
-      stack: error instanceof Error ? error.stack?.split('\n').slice(0, 8) : undefined,
     });
   }
 }
