@@ -273,6 +273,24 @@ html.dark .zayro-header-scrolled {
   background: currentColor;
 }
 
+.zayro-nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cfc4c5 transparent;
+}
+.zayro-nav-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.zayro-nav-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.zayro-nav-scroll::-webkit-scrollbar-thumb {
+  background: #cfc4c5;
+  border-radius: 999px;
+}
+.zayro-nav-scroll::-webkit-scrollbar-thumb:hover {
+  background: #5d5f5f;
+}
+
 /* Dropdown / tooltip entrance */
 .zayro-dropdown-panel {
   animation: scale-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
