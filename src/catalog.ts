@@ -132,6 +132,10 @@ const missingWomenCategories = CATEGORIES.filter(
 if (missingWomenCategories.length) {
   categoryList = [...categoryList, ...missingWomenCategories];
 }
+categoryList = categoryList.map((c) => {
+  const builtIn = isWomenCategory(c.slug) ? CATEGORIES.find((d) => d.slug === c.slug) : undefined;
+  return builtIn && builtIn.name !== c.name ? { ...c, name: builtIn.name } : c;
+});
 
 if (!localStorage.getItem(CATALOG_KEY)) {
   persist();
