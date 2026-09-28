@@ -49,7 +49,7 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     { label: 'Footwear', value: 'shoes' },
     { label: 'Accessories', value: 'accessories' },
     { label: "Women's Clothing", value: 'women' },
-    ...WOMEN_SUBCATEGORIES.map((sub) => ({ label: `Women · ${sub.name}`, value: sub.slug })),
+    ...WOMEN_SUBCATEGORIES.map((sub) => ({ label: sub.name, value: sub.slug })),
     ...adminCategories
       .filter(
         (c) =>
