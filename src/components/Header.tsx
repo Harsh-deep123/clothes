@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Menu, Search, ShoppingBag, User, MapPin, ChevronDown } from 'lucide-react';
 import { ViewScreen } from '../types';
@@ -33,12 +33,8 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { t } = useI18n();
   const [scrolled, setScrolled] = useState(false);
-  const [womenMenuOpen, setWomenMenuOpen] = useState(false);
-  const [womenMenuPos, setWomenMenuPos] = useState<{ left: number; top: number } | null>(null);
-  const [navVisibleWidth, setNavVisibleWidth] = useState<number | null>(null);
-  const womenMenuRef = useRef<HTMLDivElement>(null);
-  const womenPanelRef = useRef<HTMLDivElement>(null);
-  const navScrollRef = useRef<HTMLDivElement>(null);
+  const [openMenu, setOpenMenu] = useState<'women' | 'more' | null>(null);
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
   const navItems = [
     { key: 'nav.home' as MessageKey, id: 'home', screen: 'home' as ViewScreen, category: undefined },
     { key: 'nav.newArrivals' as MessageKey, id: 'new-arrivals', screen: 'new-arrivals' as ViewScreen, category: undefined },
@@ -54,17 +50,30 @@ export const Header: React.FC<HeaderProps> = ({
     { key: 'nav.sale' as MessageKey, id: 'sale', screen: 'new-arrivals' as ViewScreen, category: 'sale', isSale: true },
   ];
 
+  const visibleNavCount = navItems.findIndex((item) => item.id === 'jeans') + 1;
+  const primaryNavItems = navItems.slice(0, visibleNavCount);
+  const moreNavItems = navItems.slice(visibleNavCount);
+
+  const toggleMenu = (menu: 'women' | 'more', trigger: HTMLElement) => {
+    if (openMenu === menu) {
+      setOpenMenu(null);
+      return;
+    }
+    const rect = trigger.getBoundingClientRect();
+    setMenuPos({ left: rect.left + rect.width / 2, top: rect.bottom + 12 });
+    setOpenMenu(menu);
+  };
+
   useEffect(() => {
-    if (!womenMenuOpen) return;
+    if (!openMenu) return;
     const onPointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (womenMenuRef.current?.contains(target) || womenPanelRef.current?.contains(target)) return;
-      setWomenMenuOpen(false);
+      if ((event.target as Element | null)?.closest?.('[data-nav-menu]')) return;
+      setOpenMenu(null);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setWomenMenuOpen(false);
+      if (event.key === 'Escape') setOpenMenu(null);
     };
-    const close = () => setWomenMenuOpen(false);
+    const close = () => setOpenMenu(null);
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
     window.addEventListener('scroll', close, { passive: true });
@@ -75,51 +84,30 @@ export const Header: React.FC<HeaderProps> = ({
       window.removeEventListener('scroll', close);
       window.removeEventListener('resize', close);
     };
-  }, [womenMenuOpen]);
+  }, [openMenu]);
 
-  useLayoutEffect(() => {
-    const measure = () => {
-      const scroller = navScrollRef.current;
-      const lastVisible = scroller?.querySelector<HTMLElement>('#nav-jeans');
-      if (!scroller || !lastVisible || !lastVisible.offsetWidth) return;
-      const paddingRight = parseFloat(getComputedStyle(scroller).paddingRight) || 0;
-      setNavVisibleWidth(Math.ceil(lastVisible.offsetLeft + lastVisible.offsetWidth + paddingRight));
-    };
-    measure();
-    document.fonts?.ready.then(measure).catch(() => undefined);
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [t]);
+  const onShopScreen = currentScreen === 'category' || currentScreen === 'new-arrivals';
+  const isItemActive = (item: (typeof navItems)[number]) =>
+    (item.screen === 'home' && currentScreen === 'home') ||
+    (item.screen === 'new-arrivals' && currentScreen === 'new-arrivals' && !activeCategory && !item.category) ||
+    (activeCategory === item.category && onShopScreen) ||
+    (item.id === 'women' && onShopScreen && isWomenCategory(activeCategory));
+  const moreActive = moreNavItems.some(isItemActive);
 
-  useEffect(() => {
-    const scroller = navScrollRef.current;
-    if (!scroller) return;
-    const onWheel = (event: WheelEvent) => {
-      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
-      const maxScroll = scroller.scrollWidth - scroller.clientWidth;
-      if (maxScroll <= 0) return;
-      const atStart = scroller.scrollLeft <= 0 && event.deltaY < 0;
-      const atEnd = scroller.scrollLeft >= maxScroll - 1 && event.deltaY > 0;
-      if (atStart || atEnd) return;
-      event.preventDefault();
-      scroller.scrollLeft += event.deltaY;
-    };
-    scroller.addEventListener('wheel', onWheel, { passive: false });
-    return () => scroller.removeEventListener('wheel', onWheel);
-  }, []);
-
-  useEffect(() => {
-    const scroller = navScrollRef.current;
-    const active = scroller?.querySelector<HTMLElement>('.is-active');
-    if (!scroller || !active) return;
-    const left = active.offsetLeft;
-    const right = left + active.offsetWidth;
-    if (left < scroller.scrollLeft) {
-      scroller.scrollTo({ left: Math.max(0, left - 16), behavior: 'smooth' });
-    } else if (right > scroller.scrollLeft + scroller.clientWidth) {
-      scroller.scrollTo({ left: right - scroller.clientWidth + 16, behavior: 'smooth' });
-    }
-  }, [currentScreen, activeCategory]);
+  const renderMenuPanel = (children: React.ReactNode) =>
+    menuPos &&
+    createPortal(
+      <div
+        data-nav-menu
+        className="fixed z-[80] w-64 -translate-x-1/2"
+        style={{ left: menuPos.left, top: menuPos.top }}
+      >
+        <div className="zayro-dropdown-panel bg-white border border-[#cfc4c5]/40 shadow-xl max-h-[70vh] overflow-y-auto">
+          {children}
+        </div>
+      </div>,
+      document.body,
+    );
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -209,85 +197,58 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <nav className="hidden md:flex justify-center px-4 py-3.5 border-t border-[#cfc4c5]/20 bg-[#f9f9f9]">
-        <div
-          ref={navScrollRef}
-          onScroll={() => setWomenMenuOpen(false)}
-          className="zayro-nav-scroll relative flex items-center gap-x-8 overflow-x-auto whitespace-nowrap px-1 max-w-full"
-          style={navVisibleWidth ? { width: navVisibleWidth } : undefined}
-        >
-        {navItems.map((item) => {
-          const onShopScreen = currentScreen === 'category' || currentScreen === 'new-arrivals';
-          const isActive =
-            (item.screen === 'home' && currentScreen === 'home') ||
-            (item.screen === 'new-arrivals' &&
-              currentScreen === 'new-arrivals' &&
-              !activeCategory &&
-              !item.category) ||
-            (activeCategory === item.category && onShopScreen) ||
-            (item.id === 'women' && onShopScreen && isWomenCategory(activeCategory));
+        <div className="flex items-center gap-x-5 lg:gap-x-8 whitespace-nowrap">
+        {primaryNavItems.map((item) => {
+          const isActive = isItemActive(item);
 
           if (item.id === 'women') {
             return (
-              <div key={item.id} ref={womenMenuRef} className="relative">
+              <div key={item.id} data-nav-menu className="relative">
                 <button
                   type="button"
                   id={`nav-${item.id}`}
                   aria-haspopup="true"
-                  aria-expanded={womenMenuOpen}
-                  onClick={(event) => {
-                    if (womenMenuOpen) {
-                      setWomenMenuOpen(false);
-                      return;
-                    }
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    setWomenMenuPos({ left: rect.left + rect.width / 2, top: rect.bottom + 12 });
-                    setWomenMenuOpen(true);
-                  }}
+                  aria-expanded={openMenu === 'women'}
+                  onClick={(event) => toggleMenu('women', event.currentTarget)}
                   className={`zayro-nav-link flex items-center gap-1 text-xs uppercase tracking-[0.15em] font-medium py-1 relative cursor-pointer ${
                     isActive ? 'is-active text-black font-semibold' : 'text-[#5d5f5f] hover:text-black'
                   }`}
                 >
                   {t(item.key)}
                   <ChevronDown
-                    className={`w-3.5 h-3.5 stroke-[1.8] transition-transform ${womenMenuOpen ? 'rotate-180' : ''}`}
+                    className={`w-3.5 h-3.5 stroke-[1.8] transition-transform ${openMenu === 'women' ? 'rotate-180' : ''}`}
                   />
                 </button>
-                {womenMenuOpen && womenMenuPos && createPortal(
-                  <div
-                    ref={womenPanelRef}
-                    className="fixed z-[80] w-64 -translate-x-1/2"
-                    style={{ left: womenMenuPos.left, top: womenMenuPos.top }}
-                  >
-                  <div className="zayro-dropdown-panel bg-white border border-[#cfc4c5]/40 shadow-xl max-h-[70vh] overflow-y-auto">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWomenMenuOpen(false);
-                        onNavigate('category', 'women');
-                      }}
-                      className="block w-full text-left px-6 py-3.5 text-sm font-semibold text-black border-b border-[#cfc4c5]/40 hover:bg-[#eeeeee] cursor-pointer"
-                    >
-                      View All
-                    </button>
-                    {WOMEN_SUBCATEGORIES.map((sub) => (
+                {openMenu === 'women' &&
+                  renderMenuPanel(
+                    <>
                       <button
-                        key={sub.slug}
                         type="button"
                         onClick={() => {
-                          setWomenMenuOpen(false);
-                          onNavigate('category', sub.slug);
+                          setOpenMenu(null);
+                          onNavigate('category', 'women');
                         }}
-                        className={`block w-full text-left px-6 py-3.5 text-sm border-b last:border-b-0 border-[#cfc4c5]/40 hover:bg-[#eeeeee] cursor-pointer ${
-                          activeCategory === sub.slug ? 'text-black font-semibold' : 'text-[#5d5f5f]'
-                        }`}
+                        className="block w-full text-left px-6 py-3.5 text-sm font-semibold text-black border-b border-[#cfc4c5]/40 hover:bg-[#eeeeee] cursor-pointer"
                       >
-                        {sub.name}
+                        View All
                       </button>
-                    ))}
-                  </div>
-                  </div>,
-                  document.body,
-                )}
+                      {WOMEN_SUBCATEGORIES.map((sub) => (
+                        <button
+                          key={sub.slug}
+                          type="button"
+                          onClick={() => {
+                            setOpenMenu(null);
+                            onNavigate('category', sub.slug);
+                          }}
+                          className={`block w-full text-left px-6 py-3.5 text-sm border-b last:border-b-0 border-[#cfc4c5]/40 hover:bg-[#eeeeee] cursor-pointer ${
+                            activeCategory === sub.slug ? 'text-black font-semibold' : 'text-[#5d5f5f]'
+                          }`}
+                        >
+                          {sub.name}
+                        </button>
+                      ))}
+                    </>,
+                  )}
               </div>
             );
           }
@@ -309,6 +270,49 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           );
         })}
+
+        {moreNavItems.length > 0 && (
+          <div data-nav-menu className="relative">
+            <button
+              type="button"
+              id="nav-view-all"
+              aria-haspopup="true"
+              aria-expanded={openMenu === 'more'}
+              onClick={(event) => toggleMenu('more', event.currentTarget)}
+              className={`zayro-nav-link flex items-center gap-1 text-xs uppercase tracking-[0.15em] font-medium py-1 relative cursor-pointer ${
+                moreActive ? 'is-active text-black font-semibold' : 'text-[#5d5f5f] hover:text-black'
+              }`}
+            >
+              {t('nav.viewAll')}
+              <ChevronDown
+                className={`w-3.5 h-3.5 stroke-[1.8] transition-transform ${openMenu === 'more' ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {openMenu === 'more' &&
+              renderMenuPanel(
+                moreNavItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    id={`nav-${item.id}`}
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onNavigate(item.screen, item.category);
+                    }}
+                    className={`block w-full text-left px-6 py-3.5 text-sm border-b last:border-b-0 border-[#cfc4c5]/40 hover:bg-[#eeeeee] cursor-pointer ${
+                      item.isSale
+                        ? 'text-[#ba1a1a] font-semibold'
+                        : isItemActive(item)
+                          ? 'text-black font-semibold'
+                          : 'text-[#5d5f5f]'
+                    }`}
+                  >
+                    {t(item.key)}
+                  </button>
+                )),
+              )}
+          </div>
+        )}
         </div>
       </nav>
     </header>

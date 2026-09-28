@@ -273,14 +273,6 @@ html.dark .zayro-header-scrolled {
   background: currentColor;
 }
 
-.zayro-nav-scroll {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.zayro-nav-scroll::-webkit-scrollbar {
-  display: none;
-}
-
 /* Dropdown / tooltip entrance */
 .zayro-dropdown-panel {
   animation: scale-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
