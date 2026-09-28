@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AccountTab, LocalAccount, PlacedOrder, SavedAddress, ViewScreen } from '../../types';
 import { formatINR } from '../../lib/money';
 import { OrderTrackingModal } from '../OrderTrackingModal';
@@ -18,6 +18,17 @@ interface AccountPageProps {
   onSaveAddress: (address: SavedAddress) => void;
   onRemoveAddress: (id: string) => void;
   onLogout: () => void;
+}
+
+const TRACK_ORDER_KEY = 'zayro_track_order';
+
+// Captured at load because the router rewrites the URL (dropping ?track=) before the page renders,
+// and the customer may have to sign in first.
+try {
+  const fromQr = new URLSearchParams(window.location.search).get('track');
+  if (fromQr) sessionStorage.setItem(TRACK_ORDER_KEY, fromQr.trim());
+} catch {
+  /* ignore */
 }
 
 const navItems: { id: AccountTab; label: string }[] = [
@@ -61,6 +72,33 @@ export const AccountPage: React.FC<AccountPageProps> = ({
     postalCode: '',
     country: 'United States',
   });
+
+  const openTracking = (order: PlacedOrder) => {
+    setTrackingOrder(order);
+    setTrackingError(null);
+    setTrackingLoading(true);
+    void apiGetOrderTracking(order.id)
+      .then((latest) => setTrackingOrder({ ...order, ...latest, items: latest.items.length ? latest.items : order.items }))
+      .catch((err) => setTrackingError(err instanceof Error ? err.message : 'Could not load tracking.'))
+      .finally(() => setTrackingLoading(false));
+  };
+
+  useEffect(() => {
+    if (tab !== 'orders') return;
+    const wanted = sessionStorage.getItem(TRACK_ORDER_KEY);
+    if (!wanted) return;
+    sessionStorage.removeItem(TRACK_ORDER_KEY);
+    const needle = wanted.toLowerCase();
+    const local = orders.find((o) => o.id.toLowerCase() === needle || o.number.toLowerCase() === needle);
+    if (local) {
+      openTracking(local);
+      return;
+    }
+    void apiGetOrderTracking(wanted)
+      .then((remote) => setTrackingOrder(remote))
+      .catch(() => setReviewNotice(`Order ${wanted} was not found in this account.`));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, orders]);
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,15 +211,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                       <button
                         type="button"
                         className="mt-3 text-xs uppercase tracking-[0.15em] font-semibold text-black hover:underline"
-                        onClick={() => {
-                          setTrackingOrder(order);
-                          setTrackingError(null);
-                          setTrackingLoading(true);
-                          void apiGetOrderTracking(order.id)
-                            .then((latest) => setTrackingOrder({ ...order, ...latest, items: latest.items.length ? latest.items : order.items }))
-                            .catch((err) => setTrackingError(err instanceof Error ? err.message : 'Could not load tracking.'))
-                            .finally(() => setTrackingLoading(false));
-                        }}
+                        onClick={() => openTracking(order)}
                       >
                         Track Order
                       </button>
