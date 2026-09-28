@@ -16,7 +16,8 @@ export const WOMEN_SUBCATEGORIES: { slug: string; name: string }[] = [
 
 export const STORE_SECTION_CATEGORIES: { slug: string; name: string }[] = [
   { slug: 'home-decor', name: 'Home & Decor' },
-  { slug: 'auto-electrical', name: 'Auto & Electrical Parts & Accessories' },
+  { slug: 'auto-electrical', name: 'Auto & Electrical Parts' },
+  { slug: 'accessories', name: 'Accessories' },
 ];
 
 export const CATEGORIES: CategoryInfo[] = [

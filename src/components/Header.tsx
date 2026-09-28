@@ -45,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
     { key: 'nav.bottomwear' as MessageKey, id: 'bottomwear', screen: 'category' as ViewScreen, category: 'bottomwear' },
     { key: 'nav.homeDecor' as MessageKey, id: 'home-decor', screen: 'category' as ViewScreen, category: 'home-decor' },
     { key: 'nav.autoParts' as MessageKey, id: 'auto-electrical', screen: 'category' as ViewScreen, category: 'auto-electrical' },
+    { key: 'nav.accessories' as MessageKey, id: 'accessories', screen: 'category' as ViewScreen, category: 'accessories' },
     { key: 'nav.sale' as MessageKey, id: 'sale', screen: 'new-arrivals' as ViewScreen, category: 'sale', isSale: true },
   ];
 

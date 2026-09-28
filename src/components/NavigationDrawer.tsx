@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Sofa,
   Car,
+  Watch,
   Home,
   Sparkles,
   User,
@@ -122,6 +123,13 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
       icon: Car,
       screen: 'category' as ViewScreen,
       category: 'auto-electrical',
+    },
+    {
+      key: 'nav.accessories' as MessageKey,
+      id: 'accessories',
+      icon: Watch,
+      screen: 'category' as ViewScreen,
+      category: 'accessories',
     },
     {
       key: 'nav.sale' as MessageKey,
