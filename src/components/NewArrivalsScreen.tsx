@@ -4,6 +4,7 @@ import { Product } from '../types';
 import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { useAdminCategories, useStorefrontProducts } from '../hooks/useCatalog';
+import { FilterSelect } from './FilterSelect';
 import {
   HEALTH_BEAUTY_SUBCATEGORIES,
   isHealthBeautyCategory,
@@ -153,6 +154,8 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
   };
 
   const displayedProducts = filteredProducts.slice(0, visibleCount);
+  const pillClass =
+    'border border-[#cfc4c5] px-3 py-1.5 text-xs text-[#1a1c1c] hover:border-black transition-colors bg-transparent cursor-pointer uppercase tracking-wider';
 
   return (
     <main className="flex-grow pt-28 md:pt-36 px-5 md:px-16 max-w-[1440px] mx-auto w-full">
@@ -195,55 +198,40 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
 
           {/* Category Dropdown Pill */}
           <div className="hidden sm:flex items-center gap-2">
-            <select
+            <FilterSelect
+              ariaLabel="Category"
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="border border-[#cfc4c5] px-3 py-1.5 text-xs text-[#1a1c1c] hover:border-black transition-colors bg-transparent cursor-pointer uppercase tracking-wider focus:outline-none"
-            >
-              {categories.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedCategory}
+              options={categories}
+              buttonClassName={`${pillClass} min-w-[10rem]`}
+            />
 
-            <select
+            <FilterSelect
+              ariaLabel="Size"
               value={selectedSize}
-              onChange={(e) => setSelectedSize(e.target.value)}
-              className="border border-[#cfc4c5] px-3 py-1.5 text-xs text-[#1a1c1c] hover:border-black transition-colors bg-transparent cursor-pointer uppercase tracking-wider focus:outline-none"
-            >
-              <option value="all">Size: All</option>
-              {sizes.filter((s) => s !== 'all').map((s) => (
-                <option key={s} value={s}>
-                  Size: {s}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedSize}
+              options={[
+                { value: 'all', label: 'Size: All' },
+                ...sizes.filter((s) => s !== 'all').map((s) => ({ value: s, label: `Size: ${s}` })),
+              ]}
+              buttonClassName={pillClass}
+            />
 
-            <select
+            <FilterSelect
+              ariaLabel="Color"
               value={selectedColor}
-              onChange={(e) => setSelectedColor(e.target.value)}
-              className="border border-[#cfc4c5] px-3 py-1.5 text-xs text-[#1a1c1c] hover:border-black transition-colors bg-transparent cursor-pointer uppercase tracking-wider focus:outline-none"
-            >
-              <option value="all">Color: All</option>
-              {colors.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedColor}
+              options={[{ value: 'all', label: 'Color: All' }, ...colors.map((c) => ({ value: c, label: c }))]}
+              buttonClassName={`${pillClass} min-w-[8rem]`}
+            />
 
-            <select
+            <FilterSelect
+              ariaLabel="Price"
               value={selectedPriceRange}
-              onChange={(e) => setSelectedPriceRange(e.target.value)}
-              className="border border-[#cfc4c5] px-3 py-1.5 text-xs text-[#1a1c1c] hover:border-black transition-colors bg-transparent cursor-pointer uppercase tracking-wider focus:outline-none"
-            >
-              {priceRanges.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedPriceRange}
+              options={priceRanges}
+              buttonClassName={`${pillClass} min-w-[8rem]`}
+            />
           </div>
 
           {activeFilterCount > 0 && (
@@ -261,19 +249,21 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
           <label htmlFor="sort-select" className="text-xs uppercase tracking-wider text-[#5d5f5f] hidden md:block">
             Sort by:
           </label>
-          <div className="relative w-full md:w-48">
-            <select
+          <div className="w-full md:w-48">
+            <FilterSelect
               id="sort-select"
+              ariaLabel="Sort by"
+              align="right"
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="w-full appearance-none border-b border-[#cfc4c5] bg-transparent py-1.5 pl-2 pr-7 text-xs uppercase tracking-wider text-black focus:border-black focus:outline-none cursor-pointer"
-            >
-              <option value="newest">Newest Arrivals</option>
-              <option value="popular">Most Popular</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[#5d5f5f]" />
+              onChange={(value) => setSortBy(value as typeof sortBy)}
+              options={[
+                { value: 'newest', label: 'Newest Arrivals' },
+                { value: 'popular', label: 'Most Popular' },
+                { value: 'price-asc', label: 'Price: Low to High' },
+                { value: 'price-desc', label: 'Price: High to Low' },
+              ]}
+              buttonClassName="w-full border-b border-[#cfc4c5] bg-transparent py-1.5 pl-2 pr-1 text-xs uppercase tracking-wider text-black hover:border-black cursor-pointer"
+            />
           </div>
         </div>
       </div>
