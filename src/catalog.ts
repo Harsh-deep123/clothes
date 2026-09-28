@@ -1,4 +1,4 @@
-import { CATEGORIES, PRODUCTS, isWomenCategory } from './data/products';
+import { CATEGORIES, PRODUCTS, isAddedStoreCategory } from './data/products';
 import { CategoryInfo, Product, ReturnPolicy } from './types';
 
 export const LOW_STOCK_THRESHOLD = 5;
@@ -126,14 +126,14 @@ function persist() {
 
 let catalog: AdminProduct[] = loadRawCatalog();
 let categoryList: CategoryInfo[] = readJson<CategoryInfo[] | null>(CATEGORIES_KEY, null) || [...CATEGORIES];
-const missingWomenCategories = CATEGORIES.filter(
-  (c) => isWomenCategory(c.slug) && !categoryList.some((existing) => existing.slug === c.slug),
+const missingAddedCategories = CATEGORIES.filter(
+  (c) => isAddedStoreCategory(c.slug) && !categoryList.some((existing) => existing.slug === c.slug),
 );
-if (missingWomenCategories.length) {
-  categoryList = [...categoryList, ...missingWomenCategories];
+if (missingAddedCategories.length) {
+  categoryList = [...categoryList, ...missingAddedCategories];
 }
 categoryList = categoryList.map((c) => {
-  const builtIn = isWomenCategory(c.slug) ? CATEGORIES.find((d) => d.slug === c.slug) : undefined;
+  const builtIn = isAddedStoreCategory(c.slug) ? CATEGORIES.find((d) => d.slug === c.slug) : undefined;
   return builtIn && builtIn.name !== c.name ? { ...c, name: builtIn.name } : c;
 });
 

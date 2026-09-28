@@ -4,7 +4,12 @@ import { Product } from '../types';
 import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { useAdminCategories, useStorefrontProducts } from '../hooks/useCatalog';
-import { WOMEN_SUBCATEGORIES, isWomenCategory } from '../data/products';
+import {
+  STORE_SECTION_CATEGORIES,
+  WOMEN_SUBCATEGORIES,
+  isAddedStoreCategory,
+  isWomenCategory,
+} from '../data/products';
 
 interface NewArrivalsScreenProps {
   onSelectProduct: (product: Product) => void;
@@ -50,11 +55,12 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     { label: 'Accessories', value: 'accessories' },
     { label: "Women's Clothing", value: 'women' },
     ...WOMEN_SUBCATEGORIES.map((sub) => ({ label: sub.name, value: sub.slug })),
+    ...STORE_SECTION_CATEGORIES.map((section) => ({ label: section.name, value: section.slug })),
     ...adminCategories
       .filter(
         (c) =>
           !['jackets', 't-shirts', 'shirts', 'jeans', 'bottomwear', 'cargos', 'shoes', 'accessories'].includes(c.slug) &&
-          !isWomenCategory(c.slug),
+          !isAddedStoreCategory(c.slug),
       )
       .map((c) => ({ label: c.name, value: c.slug })),
   ];

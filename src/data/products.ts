@@ -14,6 +14,11 @@ export const WOMEN_SUBCATEGORIES: { slug: string; name: string }[] = [
   { slug: 'women-plus-size', name: 'Plus Size' },
 ];
 
+export const STORE_SECTION_CATEGORIES: { slug: string; name: string }[] = [
+  { slug: 'home-decor', name: 'Home & Decor' },
+  { slug: 'auto-electrical', name: 'Auto & Electrical Parts & Accessories' },
+];
+
 export const CATEGORIES: CategoryInfo[] = [
   {
     id: 'jackets',
@@ -71,10 +76,22 @@ export const CATEGORIES: CategoryInfo[] = [
     description: `Women's ${sub.name}`,
     gridSpan: 'md:col-span-1',
   })),
+  ...STORE_SECTION_CATEGORIES.map((section) => ({
+    id: section.slug,
+    name: section.name,
+    slug: section.slug,
+    image: '/images/new-standard-editorial.jpg',
+    description: section.name,
+    gridSpan: 'md:col-span-1',
+  })),
 ];
 
 export function isWomenCategory(slug: string | null | undefined): boolean {
   return slug === 'women' || WOMEN_SUBCATEGORIES.some((sub) => sub.slug === slug);
+}
+
+export function isAddedStoreCategory(slug: string | null | undefined): boolean {
+  return isWomenCategory(slug) || STORE_SECTION_CATEGORIES.some((section) => section.slug === slug);
 }
 
 export const PRODUCTS: Product[] = [

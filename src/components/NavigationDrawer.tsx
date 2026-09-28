@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import {
   X,
   ChevronDown,
+  Sofa,
+  Car,
   Home,
   Sparkles,
   User,
@@ -106,6 +108,20 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
       icon: Maximize2,
       screen: 'category' as ViewScreen,
       category: 'bottomwear',
+    },
+    {
+      key: 'nav.homeDecor' as MessageKey,
+      id: 'home-decor',
+      icon: Sofa,
+      screen: 'category' as ViewScreen,
+      category: 'home-decor',
+    },
+    {
+      key: 'nav.autoParts' as MessageKey,
+      id: 'auto-electrical',
+      icon: Car,
+      screen: 'category' as ViewScreen,
+      category: 'auto-electrical',
     },
     {
       key: 'nav.sale' as MessageKey,

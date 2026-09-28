@@ -43,6 +43,8 @@ export const Header: React.FC<HeaderProps> = ({
     { key: 'nav.shirts' as MessageKey, id: 'shirts', screen: 'category' as ViewScreen, category: 'shirts' },
     { key: 'nav.jeans' as MessageKey, id: 'jeans', screen: 'category' as ViewScreen, category: 'jeans' },
     { key: 'nav.bottomwear' as MessageKey, id: 'bottomwear', screen: 'category' as ViewScreen, category: 'bottomwear' },
+    { key: 'nav.homeDecor' as MessageKey, id: 'home-decor', screen: 'category' as ViewScreen, category: 'home-decor' },
+    { key: 'nav.autoParts' as MessageKey, id: 'auto-electrical', screen: 'category' as ViewScreen, category: 'auto-electrical' },
     { key: 'nav.sale' as MessageKey, id: 'sale', screen: 'new-arrivals' as ViewScreen, category: 'sale', isSale: true },
   ];
 
@@ -151,7 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      <nav className="hidden md:flex justify-center items-center gap-8 py-3.5 border-t border-[#cfc4c5]/20 bg-[#f9f9f9]">
+      <nav className="hidden md:flex flex-wrap justify-center items-center gap-x-5 lg:gap-x-8 gap-y-2 px-4 py-3.5 border-t border-[#cfc4c5]/20 bg-[#f9f9f9]">
         {navItems.map((item) => {
           const onShopScreen = currentScreen === 'category' || currentScreen === 'new-arrivals';
           const isActive =
