@@ -18,6 +18,36 @@ interface AdminProductFormProps {
   notify: (message: string, type: 'success' | 'error') => void;
 }
 
+const HEX_PATTERN = /^#[0-9A-Fa-f]{6}$/;
+
+const COLOR_PRESETS: { name: string; hex: string }[] = [
+  { name: 'Black', hex: '#000000' },
+  { name: 'White', hex: '#FFFFFF' },
+  { name: 'Grey', hex: '#9CA3AF' },
+  { name: 'Charcoal', hex: '#374151' },
+  { name: 'Navy', hex: '#1E3A5F' },
+  { name: 'Blue', hex: '#2563EB' },
+  { name: 'Sky Blue', hex: '#7DD3FC' },
+  { name: 'Teal', hex: '#0F766E' },
+  { name: 'Green', hex: '#15803D' },
+  { name: 'Olive', hex: '#6B7234' },
+  { name: 'Mint', hex: '#A7F3D0' },
+  { name: 'Yellow', hex: '#FACC15' },
+  { name: 'Mustard', hex: '#CA8A04' },
+  { name: 'Orange', hex: '#EA580C' },
+  { name: 'Red', hex: '#DC2626' },
+  { name: 'Maroon', hex: '#7F1D1D' },
+  { name: 'Pink', hex: '#F472B6' },
+  { name: 'Peach', hex: '#FBBF9A' },
+  { name: 'Purple', hex: '#7C3AED' },
+  { name: 'Lavender', hex: '#C4B5FD' },
+  { name: 'Brown', hex: '#78350F' },
+  { name: 'Beige', hex: '#E7D8C0' },
+  { name: 'Cream', hex: '#FFF8E7' },
+  { name: 'Gold', hex: '#D4AF37' },
+  { name: 'Silver', hex: '#C0C0C0' },
+];
+
 const emptyProduct = (): AdminProduct => ({
   id: '',
   name: '',
@@ -80,6 +110,22 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
   const salePrice = useMemo(() => calculateSalePrice(form), [form]);
 
   const update = (patch: Partial<AdminProduct>) => setForm((prev) => ({ ...prev, ...patch }));
+  const [openColorPicker, setOpenColorPicker] = useState<number | null>(null);
+
+  const setColorAt = (index: number, hex: string, presetName?: string) => {
+    setForm((prev) => {
+      const colors = [...prev.colors];
+      const current = colors[index];
+      const currentName = current.name.trim();
+      const nameIsAuto = !currentName || COLOR_PRESETS.some((p) => p.name === currentName);
+      colors[index] = {
+        ...current,
+        hex,
+        name: presetName && nameIsAuto ? presetName : current.name,
+      };
+      return { ...prev, colors };
+    });
+  };
 
   const applyCategory = (slug: string) => {
     const cat = categories.find((c) => c.slug === slug);
@@ -298,26 +344,19 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
               key={index}
               className="grid grid-cols-1 md:grid-cols-[auto_1fr_140px_auto] gap-3 items-end border border-slate-100 rounded-xl p-3"
             >
-              <label className="block">
+              <div className="block">
                 <span className="text-xs text-slate-500">Swatch</span>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={/^#[0-9A-Fa-f]{6}$/.test(color.hex) ? color.hex : '#000000'}
-                    onChange={(e) => {
-                      const colors = [...form.colors];
-                      colors[index] = { ...colors[index], hex: e.target.value };
-                      update({ colors });
-                    }}
-                    className="h-10 w-10 rounded-full border border-slate-200 p-0 bg-transparent cursor-pointer"
-                    aria-label={`Color swatch ${index + 1}`}
-                  />
-                  <span
-                    className="w-8 h-8 rounded-full border border-slate-300"
-                    style={{ backgroundColor: color.hex || '#000000' }}
-                  />
-                </div>
-              </label>
+                <button
+                  type="button"
+                  onClick={() => setOpenColorPicker((open) => (open === index ? null : index))}
+                  aria-expanded={openColorPicker === index}
+                  aria-label={`Choose color ${index + 1}`}
+                  className={`mt-1.5 flex h-10 w-10 items-center justify-center rounded-full border cursor-pointer ${
+                    openColorPicker === index ? 'ring-2 ring-offset-2 ring-black border-black' : 'border-slate-300'
+                  }`}
+                  style={{ backgroundColor: HEX_PATTERN.test(color.hex) ? color.hex : '#000000' }}
+                />
+              </div>
               <label className="block">
                 <span className="text-xs text-slate-500">Color name</span>
                 <input
@@ -352,11 +391,52 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
                     notify('Keep at least one color option.', 'error');
                     return;
                   }
+                  setOpenColorPicker(null);
                   update({ colors: form.colors.filter((_, i) => i !== index) });
                 }}
               >
                 Remove
               </button>
+              {openColorPicker === index && (
+                <div className="md:col-span-4 rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pick a color</p>
+                  <div className="flex flex-wrap gap-2">
+                    {COLOR_PRESETS.map((preset) => {
+                      const selected = color.hex.toLowerCase() === preset.hex.toLowerCase();
+                      return (
+                        <button
+                          key={preset.hex}
+                          type="button"
+                          title={preset.name}
+                          onClick={() => setColorAt(index, preset.hex, preset.name)}
+                          className={`h-8 w-8 rounded-full border cursor-pointer ${
+                            selected ? 'ring-2 ring-offset-2 ring-black border-black' : 'border-slate-300'
+                          }`}
+                          style={{ backgroundColor: preset.hex }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                      <input
+                        type="color"
+                        value={HEX_PATTERN.test(color.hex) ? color.hex : '#000000'}
+                        onChange={(e) => setColorAt(index, e.target.value)}
+                        className="h-8 w-10 cursor-pointer rounded border border-slate-300 bg-white p-0.5"
+                      />
+                      Custom color
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setOpenColorPicker(null)}
+                      className="ml-auto px-3 py-1.5 rounded-lg bg-black text-white text-sm"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
