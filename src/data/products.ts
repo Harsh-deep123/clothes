@@ -3,6 +3,7 @@ import { Product, CategoryInfo, CartItem } from '../types';
 export const WOMEN_SUBCATEGORIES: { slug: string; name: string }[] = [
   { slug: 'women-kurti', name: 'Kurti' },
   { slug: 'women-lehenga', name: 'Lehenga' },
+  { slug: 'women-saree', name: 'Saree' },
   { slug: 'women-suit-sets', name: 'Suit Sets' },
   { slug: 'women-blouse', name: 'Blouse' },
   { slug: 'women-co-ord-sets', name: 'Co-Ord Sets' },
