@@ -4,6 +4,7 @@ import { Product } from '../types';
 import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { useAdminCategories, useStorefrontProducts } from '../hooks/useCatalog';
+import { WOMEN_SUBCATEGORIES, isWomenCategory } from '../data/products';
 
 interface NewArrivalsScreenProps {
   onSelectProduct: (product: Product) => void;
@@ -48,8 +49,13 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     { label: 'Footwear', value: 'shoes' },
     { label: 'Accessories', value: 'accessories' },
     { label: "Women's Clothing", value: 'women' },
+    ...WOMEN_SUBCATEGORIES.map((sub) => ({ label: `Women · ${sub.name}`, value: sub.slug })),
     ...adminCategories
-      .filter((c) => !['jackets', 't-shirts', 'shirts', 'jeans', 'bottomwear', 'cargos', 'shoes', 'accessories', 'women'].includes(c.slug))
+      .filter(
+        (c) =>
+          !['jackets', 't-shirts', 'shirts', 'jeans', 'bottomwear', 'cargos', 'shoes', 'accessories'].includes(c.slug) &&
+          !isWomenCategory(c.slug),
+      )
       .map((c) => ({ label: c.name, value: c.slug })),
   ];
 
@@ -75,6 +81,8 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     if (selectedCategory && selectedCategory !== 'all') {
       if (selectedCategory === 'sale') {
         list = list.filter((p) => p.isSale || p.price <= 12499);
+      } else if (selectedCategory === 'women') {
+        list = list.filter((p) => isWomenCategory(p.category));
       } else {
         list = list.filter((p) => p.category === selectedCategory);
       }

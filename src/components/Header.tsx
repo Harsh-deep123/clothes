@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Menu, Search, ShoppingBag, User, MapPin } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Menu, Search, ShoppingBag, User, MapPin, ChevronDown } from 'lucide-react';
 import { ViewScreen } from '../types';
+import { WOMEN_SUBCATEGORIES, isWomenCategory } from '../data/products';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { useI18n } from '../i18n/LanguageContext';
@@ -31,6 +32,8 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { t } = useI18n();
   const [scrolled, setScrolled] = useState(false);
+  const [womenMenuOpen, setWomenMenuOpen] = useState(false);
+  const womenMenuRef = useRef<HTMLDivElement>(null);
   const navItems = [
     { key: 'nav.home' as MessageKey, id: 'home', screen: 'home' as ViewScreen, category: undefined },
     { key: 'nav.newArrivals' as MessageKey, id: 'new-arrivals', screen: 'new-arrivals' as ViewScreen, category: undefined },
@@ -42,6 +45,24 @@ export const Header: React.FC<HeaderProps> = ({
     { key: 'nav.bottomwear' as MessageKey, id: 'bottomwear', screen: 'category' as ViewScreen, category: 'bottomwear' },
     { key: 'nav.sale' as MessageKey, id: 'sale', screen: 'new-arrivals' as ViewScreen, category: 'sale', isSale: true },
   ];
+
+  useEffect(() => {
+    if (!womenMenuOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (womenMenuRef.current && !womenMenuRef.current.contains(event.target as Node)) {
+        setWomenMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setWomenMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [womenMenuOpen]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -132,14 +153,68 @@ export const Header: React.FC<HeaderProps> = ({
 
       <nav className="hidden md:flex justify-center items-center gap-8 py-3.5 border-t border-[#cfc4c5]/20 bg-[#f9f9f9]">
         {navItems.map((item) => {
+          const onShopScreen = currentScreen === 'category' || currentScreen === 'new-arrivals';
           const isActive =
             (item.screen === 'home' && currentScreen === 'home') ||
             (item.screen === 'new-arrivals' &&
               currentScreen === 'new-arrivals' &&
               !activeCategory &&
               !item.category) ||
-            (activeCategory === item.category &&
-              (currentScreen === 'category' || currentScreen === 'new-arrivals'));
+            (activeCategory === item.category && onShopScreen) ||
+            (item.id === 'women' && onShopScreen && isWomenCategory(activeCategory));
+
+          if (item.id === 'women') {
+            return (
+              <div key={item.id} ref={womenMenuRef} className="relative">
+                <button
+                  type="button"
+                  id={`nav-${item.id}`}
+                  aria-haspopup="true"
+                  aria-expanded={womenMenuOpen}
+                  onClick={() => setWomenMenuOpen((open) => !open)}
+                  className={`zayro-nav-link flex items-center gap-1 text-xs uppercase tracking-[0.15em] font-medium py-1 relative cursor-pointer ${
+                    isActive ? 'is-active text-black font-semibold' : 'text-[#5d5f5f] hover:text-black'
+                  }`}
+                >
+                  {t(item.key)}
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 stroke-[1.8] transition-transform ${womenMenuOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {womenMenuOpen && (
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 z-[80] w-64">
+                  <div className="zayro-dropdown-panel bg-white border border-[#cfc4c5]/40 shadow-xl max-h-[70vh] overflow-y-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWomenMenuOpen(false);
+                        onNavigate('category', 'women');
+                      }}
+                      className="block w-full text-left px-6 py-3.5 text-sm font-semibold text-black border-b border-[#cfc4c5]/40 hover:bg-[#eeeeee] cursor-pointer"
+                    >
+                      View All
+                    </button>
+                    {WOMEN_SUBCATEGORIES.map((sub) => (
+                      <button
+                        key={sub.slug}
+                        type="button"
+                        onClick={() => {
+                          setWomenMenuOpen(false);
+                          onNavigate('category', sub.slug);
+                        }}
+                        className={`block w-full text-left px-6 py-3.5 text-sm border-b last:border-b-0 border-[#cfc4c5]/40 hover:bg-[#eeeeee] cursor-pointer ${
+                          activeCategory === sub.slug ? 'text-black font-semibold' : 'text-[#5d5f5f]'
+                        }`}
+                      >
+                        {sub.name}
+                      </button>
+                    ))}
+                  </div>
+                  </div>
+                )}
+              </div>
+            );
+          }
 
           return (
             <button

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
+  ChevronDown,
   Home,
   Sparkles,
   User,
@@ -14,6 +15,7 @@ import {
   Truck
 } from 'lucide-react';
 import { ViewScreen } from '../types';
+import { WOMEN_SUBCATEGORIES, isWomenCategory } from '../data/products';
 import { useI18n } from '../i18n/LanguageContext';
 import { MessageKey } from '../i18n/languages';
 import { LanguageSelector } from './LanguageSelector';
@@ -45,6 +47,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
   onTrackOrder,
 }) => {
   const { t } = useI18n();
+  const [womenOpen, setWomenOpen] = useState(() => isWomenCategory(activeCategory));
   if (!isOpen) return null;
 
   const links = [
@@ -147,10 +150,57 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
         <nav className="flex flex-col gap-1.5">
           {links.map((link) => {
             const Icon = link.icon;
+            const onShopScreen = currentScreen === 'category' || currentScreen === 'new-arrivals';
             const isSelected =
               (link.screen === 'home' && currentScreen === 'home') ||
               (link.screen === 'new-arrivals' && currentScreen === 'new-arrivals' && !activeCategory && !link.category) ||
-              (activeCategory === link.category && (currentScreen === 'category' || currentScreen === 'new-arrivals'));
+              (activeCategory === link.category && onShopScreen) ||
+              (link.id === 'women' && onShopScreen && isWomenCategory(activeCategory));
+
+            if (link.id === 'women') {
+              return (
+                <div key={link.id}>
+                  <button
+                    type="button"
+                    id={`drawer-link-${link.id}`}
+                    aria-expanded={womenOpen}
+                    onClick={() => setWomenOpen((open) => !open)}
+                    className={`flex w-full items-center gap-4 px-4 py-3.5 text-xs font-semibold uppercase tracking-[0.15em] transition-colors duration-150 text-left cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#eeeeee] text-black font-bold'
+                        : 'text-[#5d5f5f] hover:bg-[#eeeeee]/60 hover:text-black'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 stroke-[1.8]" />
+                    <span className="flex-1">{t(link.key)}</span>
+                    <ChevronDown
+                      className={`w-4 h-4 stroke-[1.8] transition-transform ${womenOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  {womenOpen && (
+                    <div className="ml-8 border-l border-[#cfc4c5]/40">
+                      {[{ slug: 'women', name: 'View All' }, ...WOMEN_SUBCATEGORIES].map((sub) => (
+                        <button
+                          key={sub.slug}
+                          type="button"
+                          onClick={() => {
+                            onNavigate('category', sub.slug);
+                            onClose();
+                          }}
+                          className={`block w-full text-left px-4 py-3 text-sm border-b last:border-b-0 border-[#cfc4c5]/30 hover:bg-[#eeeeee]/60 cursor-pointer ${
+                            activeCategory === sub.slug && onShopScreen
+                              ? 'text-black font-semibold'
+                              : 'text-[#5d5f5f]'
+                          }`}
+                        >
+                          {sub.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
 
             return (
               <button

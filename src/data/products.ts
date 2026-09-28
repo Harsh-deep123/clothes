@@ -1,5 +1,18 @@
 import { Product, CategoryInfo, CartItem } from '../types';
 
+export const WOMEN_SUBCATEGORIES: { slug: string; name: string }[] = [
+  { slug: 'women-kurti', name: 'Kurti' },
+  { slug: 'women-lehenga', name: 'Lehenga' },
+  { slug: 'women-suit-sets', name: 'Suit Sets' },
+  { slug: 'women-blouse', name: 'Blouse' },
+  { slug: 'women-co-ord-sets', name: 'Co-Ord Sets' },
+  { slug: 'women-gown', name: 'Gown' },
+  { slug: 'women-indo-western', name: 'Indo Western' },
+  { slug: 'women-pakistani-suit', name: 'Pakistani Suit' },
+  { slug: 'women-salwar-suits', name: 'Salwar Suits' },
+  { slug: 'women-plus-size', name: 'Plus Size' },
+];
+
 export const CATEGORIES: CategoryInfo[] = [
   {
     id: 'jackets',
@@ -48,8 +61,20 @@ export const CATEGORIES: CategoryInfo[] = [
     image: '/images/new-standard-editorial.jpg',
     description: 'Tops, dresses, co-ords and everyday essentials for women',
     gridSpan: 'md:col-span-1'
-  }
+  },
+  ...WOMEN_SUBCATEGORIES.map((sub) => ({
+    id: sub.slug,
+    name: sub.name,
+    slug: sub.slug,
+    image: '/images/new-standard-editorial.jpg',
+    description: `Women's ${sub.name}`,
+    gridSpan: 'md:col-span-1',
+  })),
 ];
+
+export function isWomenCategory(slug: string | null | undefined): boolean {
+  return slug === 'women' || WOMEN_SUBCATEGORIES.some((sub) => sub.slug === slug);
+}
 
 export const PRODUCTS: Product[] = [
   {
