@@ -49,7 +49,8 @@ export function pathForRoute(route: AppRoute): string {
       return '/';
     case 'new-arrivals':
       if (route.category === 'sale') return '/sale';
-      if (route.category && route.category !== 'all') return `/shop/${route.category}`;
+      if (route.category === 'all') return '/men';
+      if (route.category) return `/shop/${route.category}`;
       return '/new-arrivals';
     case 'category':
       if (route.category) return `/shop/${route.category}`;
@@ -93,6 +94,7 @@ export function parseLocation(pathname: string, search = ''): AppRoute {
   if (path === '/') return { screen: 'home' };
   if (path === '/new-arrivals') return { screen: 'new-arrivals' };
   if (path === '/sale') return { screen: 'new-arrivals', category: 'sale' };
+  if (path === '/men') return { screen: 'new-arrivals', category: 'all' };
 
   if (path.startsWith('/shop/')) {
     const category = path.slice('/shop/'.length);

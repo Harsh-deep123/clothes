@@ -32,10 +32,10 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
 
   // Sync category filter if changed from prop
   React.useEffect(() => {
-    if (categoryFilter) {
-      setSelectedCategory(categoryFilter);
-    }
+    setSelectedCategory(categoryFilter || 'all');
   }, [categoryFilter]);
+
+  const isMenPage = categoryFilter === 'all';
 
   const categories = [
     { label: 'All Categories', value: 'all' },
@@ -139,11 +139,15 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
           className="font-serif-luxury text-3xl sm:text-5xl md:text-6xl tracking-tight uppercase text-black font-normal"
         >
           {selectedCategory === 'all'
-            ? 'New Arrivals'
+            ? isMenPage
+              ? 'Men'
+              : 'New Arrivals'
             : categories.find((c) => c.value === selectedCategory)?.label || 'Collection'}
         </h1>
         <p className="text-base sm:text-lg text-[#5d5f5f] mt-3 md:mt-4 max-w-2xl font-light">
-          Discover the latest additions to our collection. Minimalist design meets premium craftsmanship.
+          {isMenPage && selectedCategory === 'all'
+            ? 'Explore the complete ZAYRO menswear collection — tailoring, shirts, denim, and everyday essentials.'
+            : 'Discover the latest additions to our collection. Minimalist design meets premium craftsmanship.'}
         </p>
       </div>
 
