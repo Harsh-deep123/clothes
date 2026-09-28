@@ -5,6 +5,8 @@ import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { useAdminCategories, useStorefrontProducts } from '../hooks/useCatalog';
 import {
+  HEALTH_BEAUTY_SUBCATEGORIES,
+  isHealthBeautyCategory,
   STORE_SECTION_CATEGORIES,
   WOMEN_SUBCATEGORIES,
   isAddedStoreCategory,
@@ -59,6 +61,8 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
       label: section.name,
       value: section.slug,
     })),
+    { label: 'Health & Beauty', value: 'health-beauty' },
+    ...HEALTH_BEAUTY_SUBCATEGORIES.map((sub) => ({ label: sub.name, value: sub.slug })),
     ...adminCategories
       .filter(
         (c) =>
@@ -92,6 +96,8 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
         list = list.filter((p) => p.isSale || p.price <= 12499);
       } else if (selectedCategory === 'women') {
         list = list.filter((p) => isWomenCategory(p.category));
+      } else if (selectedCategory === 'health-beauty') {
+        list = list.filter((p) => isHealthBeautyCategory(p.category));
       } else {
         list = list.filter((p) => p.category === selectedCategory);
       }

@@ -2,7 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Menu, Search, ShoppingBag, User, MapPin, ChevronDown } from 'lucide-react';
 import { ViewScreen } from '../types';
-import { WOMEN_SUBCATEGORIES, isWomenCategory } from '../data/products';
+import {
+  HEALTH_BEAUTY_SUBCATEGORIES,
+  WOMEN_SUBCATEGORIES,
+  isHealthBeautyCategory,
+  isWomenCategory,
+} from '../data/products';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { useI18n } from '../i18n/LanguageContext';
@@ -47,6 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
     { key: 'nav.homeDecor' as MessageKey, id: 'home-decor', screen: 'category' as ViewScreen, category: 'home-decor' },
     { key: 'nav.autoParts' as MessageKey, id: 'auto-electrical', screen: 'category' as ViewScreen, category: 'auto-electrical' },
     { key: 'nav.accessories' as MessageKey, id: 'accessories', screen: 'category' as ViewScreen, category: 'accessories' },
+    { key: 'nav.healthBeauty' as MessageKey, id: 'health-beauty', screen: 'category' as ViewScreen, category: 'health-beauty' },
     { key: 'nav.sale' as MessageKey, id: 'sale', screen: 'new-arrivals' as ViewScreen, category: 'sale', isSale: true },
   ];
 
@@ -91,7 +97,8 @@ export const Header: React.FC<HeaderProps> = ({
     (item.screen === 'home' && currentScreen === 'home') ||
     (item.screen === 'new-arrivals' && currentScreen === 'new-arrivals' && !activeCategory && !item.category) ||
     (activeCategory === item.category && onShopScreen) ||
-    (item.id === 'women' && onShopScreen && isWomenCategory(activeCategory));
+    (item.id === 'women' && onShopScreen && isWomenCategory(activeCategory)) ||
+    (item.id === 'health-beauty' && onShopScreen && isHealthBeautyCategory(activeCategory));
   const moreActive = moreNavItems.some(isItemActive);
 
   const renderMenuPanel = (children: React.ReactNode) =>
@@ -290,7 +297,37 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
             {openMenu === 'more' &&
               renderMenuPanel(
-                moreNavItems.map((item) => (
+                moreNavItems.map((item) =>
+                  item.id === 'health-beauty' ? (
+                    <div key={item.id} className="border-b last:border-b-0 border-[#cfc4c5]/40 py-2">
+                      <button
+                        type="button"
+                        id={`nav-${item.id}`}
+                        onClick={() => {
+                          setOpenMenu(null);
+                          onNavigate(item.screen, item.category);
+                        }}
+                        className="block w-full text-left px-6 py-2 text-sm font-bold text-black hover:bg-[#eeeeee] cursor-pointer"
+                      >
+                        {t(item.key)}
+                      </button>
+                      {HEALTH_BEAUTY_SUBCATEGORIES.map((sub) => (
+                        <button
+                          key={sub.slug}
+                          type="button"
+                          onClick={() => {
+                            setOpenMenu(null);
+                            onNavigate('category', sub.slug);
+                          }}
+                          className={`block w-full text-left pl-10 pr-6 py-1.5 text-sm hover:bg-[#eeeeee] cursor-pointer ${
+                            activeCategory === sub.slug && onShopScreen ? 'text-black font-semibold' : 'text-[#5d5f5f]'
+                          }`}
+                        >
+                          {sub.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
                   <button
                     key={item.id}
                     type="button"
@@ -309,7 +346,8 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     {t(item.key)}
                   </button>
-                )),
+                  ),
+                ),
               )}
           </div>
         )}

@@ -14,6 +14,17 @@ export const WOMEN_SUBCATEGORIES: { slug: string; name: string }[] = [
   { slug: 'women-plus-size', name: 'Plus Size' },
 ];
 
+export const HEALTH_BEAUTY_SUBCATEGORIES: { slug: string; name: string }[] = [
+  { slug: 'beauty-health-wellness', name: 'Health and Wellness' },
+  { slug: 'beauty-perfumes', name: 'Perfumes and Fragrances' },
+  { slug: 'beauty-nail-care', name: 'Nail Care' },
+  { slug: 'beauty-massagers', name: 'Massagers' },
+  { slug: 'beauty-skincare', name: 'Skincare' },
+  { slug: 'beauty-makeup', name: 'Makeup and Organizers' },
+  { slug: 'beauty-hair-care', name: 'Hair Care' },
+  { slug: 'beauty-personal-care', name: 'Personal Care' },
+];
+
 export const STORE_SECTION_CATEGORIES: { slug: string; name: string }[] = [
   { slug: 'home-decor', name: 'Home & Decor' },
   { slug: 'auto-electrical', name: 'Auto & Electrical Parts' },
@@ -85,14 +96,38 @@ export const CATEGORIES: CategoryInfo[] = [
     description: section.name,
     gridSpan: 'md:col-span-1',
   })),
+  {
+    id: 'health-beauty',
+    name: 'Health & Beauty',
+    slug: 'health-beauty',
+    image: '/images/new-standard-editorial.jpg',
+    description: 'Wellness, fragrances, skincare, makeup, hair and personal care',
+    gridSpan: 'md:col-span-1',
+  },
+  ...HEALTH_BEAUTY_SUBCATEGORIES.map((sub) => ({
+    id: sub.slug,
+    name: sub.name,
+    slug: sub.slug,
+    image: '/images/new-standard-editorial.jpg',
+    description: sub.name,
+    gridSpan: 'md:col-span-1',
+  })),
 ];
+
+export function isHealthBeautyCategory(slug: string | null | undefined): boolean {
+  return slug === 'health-beauty' || HEALTH_BEAUTY_SUBCATEGORIES.some((sub) => sub.slug === slug);
+}
 
 export function isWomenCategory(slug: string | null | undefined): boolean {
   return slug === 'women' || WOMEN_SUBCATEGORIES.some((sub) => sub.slug === slug);
 }
 
 export function isAddedStoreCategory(slug: string | null | undefined): boolean {
-  return isWomenCategory(slug) || STORE_SECTION_CATEGORIES.some((section) => section.slug === slug);
+  return (
+    isWomenCategory(slug) ||
+    isHealthBeautyCategory(slug) ||
+    STORE_SECTION_CATEGORIES.some((section) => section.slug === slug)
+  );
 }
 
 export const PRODUCTS: Product[] = [

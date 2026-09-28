@@ -5,6 +5,7 @@ import {
   Sofa,
   Car,
   Watch,
+  HeartPulse,
   Home,
   Sparkles,
   User,
@@ -18,7 +19,17 @@ import {
   Truck
 } from 'lucide-react';
 import { ViewScreen } from '../types';
-import { WOMEN_SUBCATEGORIES, isWomenCategory } from '../data/products';
+import {
+  HEALTH_BEAUTY_SUBCATEGORIES,
+  WOMEN_SUBCATEGORIES,
+  isHealthBeautyCategory,
+  isWomenCategory,
+} from '../data/products';
+
+const DRAWER_GROUPS: Record<string, { slug: string; name: string }[]> = {
+  women: WOMEN_SUBCATEGORIES,
+  'health-beauty': HEALTH_BEAUTY_SUBCATEGORIES,
+};
 import { useI18n } from '../i18n/LanguageContext';
 import { MessageKey } from '../i18n/languages';
 import { LanguageSelector } from './LanguageSelector';
@@ -50,7 +61,9 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
   onTrackOrder,
 }) => {
   const { t } = useI18n();
-  const [womenOpen, setWomenOpen] = useState(() => isWomenCategory(activeCategory));
+  const [openGroup, setOpenGroup] = useState<string | null>(() =>
+    isWomenCategory(activeCategory) ? 'women' : isHealthBeautyCategory(activeCategory) ? 'health-beauty' : null,
+  );
   if (!isOpen) return null;
 
   const links = [
@@ -132,6 +145,13 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
       category: 'accessories',
     },
     {
+      key: 'nav.healthBeauty' as MessageKey,
+      id: 'health-beauty',
+      icon: HeartPulse,
+      screen: 'category' as ViewScreen,
+      category: 'health-beauty',
+    },
+    {
       key: 'nav.sale' as MessageKey,
       id: 'sale',
       icon: Tag,
@@ -179,16 +199,19 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
               (link.screen === 'home' && currentScreen === 'home') ||
               (link.screen === 'new-arrivals' && currentScreen === 'new-arrivals' && !activeCategory && !link.category) ||
               (activeCategory === link.category && onShopScreen) ||
-              (link.id === 'women' && onShopScreen && isWomenCategory(activeCategory));
+              (link.id === 'women' && onShopScreen && isWomenCategory(activeCategory)) ||
+              (link.id === 'health-beauty' && onShopScreen && isHealthBeautyCategory(activeCategory));
 
-            if (link.id === 'women') {
+            const groupItems = DRAWER_GROUPS[link.id];
+            if (groupItems) {
+              const groupOpen = openGroup === link.id;
               return (
                 <div key={link.id}>
                   <button
                     type="button"
                     id={`drawer-link-${link.id}`}
-                    aria-expanded={womenOpen}
-                    onClick={() => setWomenOpen((open) => !open)}
+                    aria-expanded={groupOpen}
+                    onClick={() => setOpenGroup((open) => (open === link.id ? null : link.id))}
                     className={`flex w-full items-center gap-4 px-4 py-3.5 text-xs font-semibold uppercase tracking-[0.15em] transition-colors duration-150 text-left cursor-pointer ${
                       isSelected
                         ? 'bg-[#eeeeee] text-black font-bold'
@@ -198,12 +221,12 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
                     <Icon className="w-4 h-4 stroke-[1.8]" />
                     <span className="flex-1">{t(link.key)}</span>
                     <ChevronDown
-                      className={`w-4 h-4 stroke-[1.8] transition-transform ${womenOpen ? 'rotate-180' : ''}`}
+                      className={`w-4 h-4 stroke-[1.8] transition-transform ${groupOpen ? 'rotate-180' : ''}`}
                     />
                   </button>
-                  {womenOpen && (
+                  {groupOpen && (
                     <div className="ml-8 border-l border-[#cfc4c5]/40">
-                      {[{ slug: 'women', name: 'View All' }, ...WOMEN_SUBCATEGORIES].map((sub) => (
+                      {[{ slug: link.category as string, name: 'View All' }, ...groupItems].map((sub) => (
                         <button
                           key={sub.slug}
                           type="button"
