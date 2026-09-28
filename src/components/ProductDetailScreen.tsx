@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Heart, ChevronDown, Ruler } from 'lucide-react';
 import { Product } from '../types';
-import { getStorefrontProducts, returnPolicyNote } from '../catalog';
+import { getStorefrontProducts, productHasSizes, returnPolicyNote } from '../catalog';
 import { ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { ProductReviewsSection } from './reviews/ProductReviewsSection';
@@ -141,6 +141,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
           </div>
 
           {/* Size Selector */}
+          {productHasSizes(product) && (
           <div className="mb-8">
             <div className="flex justify-between items-center mb-3">
               <p className="text-xs uppercase tracking-[0.15em] font-semibold text-black">
@@ -181,6 +182,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               })}
             </div>
           </div>
+          )}
 
           {/* Actions: Add to Bag & Buy Now */}
           <div className="flex flex-col gap-3 mb-10">

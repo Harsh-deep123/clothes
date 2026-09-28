@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CartItem, LocalAccount, PlacedOrder, SavedAddress, ViewScreen } from '../../types';
 import { CheckoutLocationMap } from '../checkout/CheckoutLocationMap';
 import { formatINR } from '../../lib/money';
+import { ONE_SIZE } from '../../catalog';
 import { cartGrandTotal, getDeliveryQuote } from '../../lib/delivery';
 import type { IpinfoLite } from '../../lib/ipinfo';
 import type { SavedDeliveryLocation } from '../LocationWelcomeModal';
@@ -354,7 +355,8 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                   <div className="flex-grow">
                     <p className="font-medium text-black">{item.product.name}</p>
                     <p className="text-[#5d5f5f]">
-                      {item.selectedColor} • Size {item.selectedSize}
+                      {item.selectedColor}
+                      {item.selectedSize !== ONE_SIZE && ` • Size ${item.selectedSize}`}
                     </p>
                     <p className="text-[#5d5f5f]">Qty: {item.quantity}</p>
                   </div>

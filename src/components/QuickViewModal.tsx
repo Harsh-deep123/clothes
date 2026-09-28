@@ -4,7 +4,7 @@ import { Product } from '../types';
 import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { formatINR } from '../lib/money';
-import { priceForSize } from '../catalog';
+import { priceForSize, productHasSizes } from '../catalog';
 
 interface QuickViewModalProps {
   product: Product | null;
@@ -102,6 +102,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
             </div>
 
             {/* Sizes */}
+            {productHasSizes(product) && (
             <div className="mb-6">
               <span className="text-[11px] uppercase tracking-wider font-semibold text-black block mb-2">
                 Size
@@ -125,6 +126,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
                 ))}
               </div>
             </div>
+            )}
           </div>
 
           <div className="space-y-3 pt-4 border-t border-[#cfc4c5]/20">

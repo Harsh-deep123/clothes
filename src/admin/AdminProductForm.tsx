@@ -49,6 +49,7 @@ const emptyProduct = (): AdminProduct => ({
   saleStart: '',
   saleEnd: '',
   returnPolicy: 'return_and_replace',
+  hasSizes: true,
 });
 
 function readFiles(files: FileList): Promise<string[]> {
@@ -100,9 +101,12 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
     if (!images.length) nextErrors.push('Add at least one product image.');
     const colors = form.colors.filter((c) => c.name.trim());
     if (!colors.length) nextErrors.push('Add at least one color option.');
+    const showSizes = form.hasSizes !== false;
     const sizes = form.sizes.filter((s) => s.size.trim());
-    if (!sizes.length) nextErrors.push('Add at least one size.');
-    if (new Set(sizes.map((s) => s.size.trim())).size !== sizes.length) nextErrors.push('Each size must be unique.');
+    if (showSizes && !sizes.length) nextErrors.push('Add at least one size.');
+    if (showSizes && new Set(sizes.map((s) => s.size.trim())).size !== sizes.length) {
+      nextErrors.push('Each size must be unique.');
+    }
     if (form.discountEnabled && (!form.discountValue || form.discountValue <= 0)) {
       nextErrors.push('Enter a discount value, or disable the discount.');
     }
@@ -128,7 +132,8 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
         hex: c.hex || '#000000',
         border: c.border,
       })),
-      sizes: sizes.map((s) => ({ ...s, size: s.size.trim() })),
+      sizes: sizes.length ? sizes.map((s) => ({ ...s, size: s.size.trim() })) : form.sizes,
+      hasSizes: showSizes,
       detailsAndCare: form.detailsAndCare.filter(Boolean),
       price: form.saleEnabled && form.discountEnabled ? salePrice : form.listPrice,
       isSale: Boolean(form.saleEnabled && form.discountEnabled && form.discountValue),
@@ -394,19 +399,32 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Sizes & price per size</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Leave the price empty to use the original price ({formatINR(form.listPrice || 0, true)}). Sale discount
-              applies to every size.
+              {form.hasSizes !== false
+                ? `Leave the price empty to use the original price (${formatINR(form.listPrice || 0, true)}). Sale discount applies to every size.`
+                : 'Size options are hidden. Customers buy this product without choosing a size; availability follows the Stock field.'}
             </p>
           </div>
-          <button
-            type="button"
-            className="px-4 py-2 rounded-xl border border-slate-200 text-sm w-fit"
-            onClick={() => update({ sizes: [...form.sizes, { size: '', available: true }] })}
-          >
-            Add size
-          </button>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.hasSizes !== false}
+                onChange={(e) => update({ hasSizes: e.target.checked })}
+              />
+              Show size options
+            </label>
+            {form.hasSizes !== false && (
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-sm w-fit"
+                onClick={() => update({ sizes: [...form.sizes, { size: '', available: true }] })}
+              >
+                Add size
+              </button>
+            )}
+          </div>
         </div>
-        {form.sizes.map((s, index) => (
+        {form.hasSizes !== false && form.sizes.map((s, index) => (
           <div
             key={index}
             className="grid grid-cols-[1fr_1fr_auto_auto] gap-3 items-end border border-slate-100 rounded-xl p-3"

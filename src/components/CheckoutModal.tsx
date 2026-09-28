@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, CheckCircle, ShieldCheck, ArrowRight, CreditCard, Lock } from 'lucide-react';
 import { CartItem } from '../types';
 import { formatINR } from '../lib/money';
+import { ONE_SIZE } from '../catalog';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -216,7 +217,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         <div className="flex-grow">
                           <p className="font-medium text-black">{item.product.name}</p>
                           <p className="text-[#5d5f5f]">
-                            {item.selectedColor} • Size: {item.selectedSize}
+                            {item.selectedColor}
+                            {item.selectedSize !== ONE_SIZE && ` • Size: ${item.selectedSize}`}
                           </p>
                           <p className="text-[#5d5f5f]">Qty: {item.quantity}</p>
                         </div>

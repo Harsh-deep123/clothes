@@ -157,6 +157,12 @@ export function calculateSalePrice(product: AdminProduct): number {
   return Math.max(0, Number((base * (1 - product.discountValue / 100)).toFixed(2)));
 }
 
+export const ONE_SIZE = 'One Size';
+
+export function productHasSizes(product: Pick<Product, 'hasSizes'>): boolean {
+  return product.hasSizes !== false;
+}
+
 export function toStorefrontProduct(product: AdminProduct): Product {
   const live = isSaleLive(product);
   const listPrice = product.listPrice || product.price;
@@ -167,7 +173,9 @@ export function toStorefrontProduct(product: AdminProduct): Product {
     price,
     originalPrice: live ? listPrice : undefined,
     isSale: live,
-    sizes: product.sizes.map((s) => ({ ...s, available: outOfStock ? false : s.available })),
+    sizes: productHasSizes(product)
+      ? product.sizes.map((s) => ({ ...s, available: outOfStock ? false : s.available }))
+      : [{ size: ONE_SIZE, available: !outOfStock }],
   };
 }
 

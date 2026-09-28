@@ -2,6 +2,7 @@ import React from 'react';
 import { Minus, Plus, ShoppingBag } from 'lucide-react';
 import { CartItem, ViewScreen } from '../../types';
 import { formatINR } from '../../lib/money';
+import { ONE_SIZE } from '../../catalog';
 import type { DeliveryQuote } from '../../lib/delivery';
 import { CartBillDetails } from '../CartBillDetails';
 
@@ -70,7 +71,9 @@ export const BagPage: React.FC<BagPageProps> = ({
                       <span className="font-semibold shrink-0">{formatINR(item.price * item.quantity)}</span>
                     </div>
                     <p className="text-sm text-[#5d5f5f] mt-1">Color: {item.selectedColor}</p>
-                    <p className="text-sm text-[#5d5f5f]">Size: {item.selectedSize}</p>
+                    {item.selectedSize !== ONE_SIZE && (
+                      <p className="text-sm text-[#5d5f5f]">Size: {item.selectedSize}</p>
+                    )}
                   </div>
                   <div className="flex justify-between items-center pt-3">
                     <div className="flex items-center border border-[#cfc4c5]">
