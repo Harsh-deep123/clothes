@@ -3,9 +3,11 @@ import {
   AdminProduct,
   calculateSalePrice,
   getCatalogProduct,
+  RETURN_POLICY_OPTIONS,
   slugify,
   upsertProduct,
 } from '../catalog';
+import type { ReturnPolicy } from '../types';
 import { useAdminCategories } from '../hooks/useCatalog';
 import { formatINR } from '../lib/money';
 
@@ -46,6 +48,7 @@ const emptyProduct = (): AdminProduct => ({
   saleEnabled: false,
   saleStart: '',
   saleEnd: '',
+  returnPolicy: 'return_and_replace',
 });
 
 function readFiles(files: FileList): Promise<string[]> {
@@ -379,6 +382,30 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
         </label>
         <p className="md:col-span-3 text-xs text-slate-500">
           {form.stock <= 0 ? 'Status: Out of stock' : form.stock <= 5 ? 'Status: Low stock' : 'Status: In stock'}
+        </p>
+      </section>
+
+      <section className="bg-white border border-slate-200 rounded-2xl p-5 grid md:grid-cols-2 gap-4">
+        <h3 className="md:col-span-2 text-sm font-semibold uppercase tracking-wider text-slate-500">
+          Return & replacement
+        </h3>
+        <label className="block">
+          <span className="text-sm">Return / replacement policy</span>
+          <select
+            value={form.returnPolicy || 'return_and_replace'}
+            onChange={(e) => update({ returnPolicy: e.target.value as ReturnPolicy })}
+            className={fieldClass}
+          >
+            {RETURN_POLICY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="text-xs text-slate-500 md:mt-7">
+          Customers cannot send a return or replace request that this product does not allow. The policy is also shown
+          on the product page.
         </p>
       </section>
 

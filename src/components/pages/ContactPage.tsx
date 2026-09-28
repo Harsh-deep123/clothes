@@ -9,6 +9,14 @@ import {
   submitReturnRequest,
 } from '../../lib/returnRequests';
 import type { ReturnRequestType } from '../../types/returnRequest';
+import { policyAllows, productReturnPolicy } from '../../catalog';
+
+function splitByPolicy(order: PlacedOrder | undefined, requestType: ReturnRequestType) {
+  const items = order?.items || [];
+  const eligible = items.filter((item) => policyAllows(productReturnPolicy(item.productId), requestType));
+  const blocked = items.filter((item) => !eligible.includes(item));
+  return { eligible, blocked };
+}
 
 interface ContactPageProps {
   onNavigate: (screen: ViewScreen, category?: string) => void;
@@ -45,11 +53,14 @@ export const ContactPage: React.FC<ContactPageProps> = ({
   const [submitting, setSubmitting] = useState(false);
 
   const isReturnSubject = form.subject === 'returns';
+  const matchedOrder = findOrderByNumber(orders, form.orderNumber);
+  const policySplit = splitByPolicy(matchedOrder, form.requestType);
+  const requestLabel = form.requestType === 'replace' ? 'replacement' : 'return';
 
   const applyOrderMatch = (orderNumber: string, current = form) => {
     const matched = findOrderByNumber(orders, orderNumber);
     if (!matched) return current;
-    const products = orderProductSummary(matched);
+    const products = orderProductSummary(matched, splitByPolicy(matched, current.requestType).eligible);
     return {
       ...current,
       orderNumber,
@@ -68,6 +79,9 @@ export const ContactPage: React.FC<ContactPageProps> = ({
     const { name, value } = e.target;
     setForm((prev) => {
       const next = { ...prev, [name]: value };
+      if (name === 'requestType' && findOrderByNumber(orders, prev.orderNumber)) {
+        return applyOrderMatch(prev.orderNumber, { ...next, productName: '', productDetails: '' });
+      }
       if (name === 'orderNumber' || name === 'subject') {
         return applyOrderMatch(name === 'orderNumber' ? value : prev.orderNumber, next);
       }
@@ -80,10 +94,16 @@ export const ContactPage: React.FC<ContactPageProps> = ({
     setSubmitError(null);
 
     if (isReturnSubject) {
+      const matched = findOrderByNumber(orders, form.orderNumber);
+      const { eligible, blocked } = splitByPolicy(matched, form.requestType);
+      if (matched && eligible.length === 0) {
+        setSubmitError(`The products in this order are not eligible for ${requestLabel}.`);
+        return;
+      }
       setSubmitting(true);
       try {
-        const matched = findOrderByNumber(orders, form.orderNumber);
-        const products = orderProductSummary(matched);
+        const products = orderProductSummary(matched, eligible);
+        const restrictToEligible = Boolean(matched && blocked.length);
         await submitReturnRequest({
           requestType: form.requestType,
           orderNumber: form.orderNumber.trim(),
@@ -91,8 +111,8 @@ export const ContactPage: React.FC<ContactPageProps> = ({
           customerPhone: form.phone.trim(),
           customerEmail: form.email.trim(),
           customerAddress: form.address.trim() || formatOrderAddress(matched),
-          productName: form.productName.trim() || products.name,
-          productDetails: form.productDetails.trim() || products.details,
+          productName: restrictToEligible ? products.name : form.productName.trim() || products.name,
+          productDetails: restrictToEligible ? products.details : form.productDetails.trim() || products.details,
           reason: form.reason.trim() || form.message.trim(),
           additionalMessage: form.message.trim(),
           orderMatched: Boolean(matched),
@@ -236,6 +256,15 @@ export const ContactPage: React.FC<ContactPageProps> = ({
                   <option value="return">Return Request</option>
                   <option value="replace">Replace Request</option>
                 </select>
+                {matchedOrder && policySplit.blocked.length > 0 && (
+                  <p className="mt-2 text-sm text-[#ba1a1a] font-light">
+                    {policySplit.eligible.length === 0
+                      ? `The products in this order are not eligible for ${requestLabel}.`
+                      : `Not eligible for ${requestLabel}: ${policySplit.blocked
+                          .map((item) => item.product.name)
+                          .join(', ')}. Your request will include only the eligible products.`}
+                  </p>
+                )}
               </div>
               <div>
                 <label htmlFor="address" className={labelClass}>

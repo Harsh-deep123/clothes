@@ -32,7 +32,10 @@ export interface Product {
   saleEnabled?: boolean;
   saleStart?: string;
   saleEnd?: string;
+  returnPolicy?: ReturnPolicy;
 }
+
+export type ReturnPolicy = 'return_and_replace' | 'replace_only' | 'return_only' | 'none';
 
 export interface CartItem {
   id: string;

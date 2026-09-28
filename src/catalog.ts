@@ -1,5 +1,5 @@
 import { CATEGORIES, PRODUCTS } from './data/products';
-import { CategoryInfo, Product } from './types';
+import { CategoryInfo, Product, ReturnPolicy } from './types';
 
 export const LOW_STOCK_THRESHOLD = 5;
 export const CATALOG_KEY = 'zayro_admin_catalog_inr_v1';
@@ -171,6 +171,31 @@ export function getStorefrontProducts(): Product[] {
 
 export function getCatalogProduct(id: string): AdminProduct | undefined {
   return catalog.find((p) => p.id === id);
+}
+
+export const RETURN_POLICY_OPTIONS: Array<{ value: ReturnPolicy; label: string }> = [
+  { value: 'return_and_replace', label: 'Return & Replacement allowed' },
+  { value: 'replace_only', label: 'Replacement only (no return)' },
+  { value: 'return_only', label: 'Return only (no replacement)' },
+  { value: 'none', label: 'No return / No replacement' },
+];
+
+export function productReturnPolicy(productId: string): ReturnPolicy {
+  return getCatalogProduct(productId)?.returnPolicy || 'return_and_replace';
+}
+
+export function policyAllows(policy: ReturnPolicy, requestType: 'return' | 'replace'): boolean {
+  if (policy === 'none') return false;
+  if (policy === 'replace_only') return requestType === 'replace';
+  if (policy === 'return_only') return requestType === 'return';
+  return true;
+}
+
+export function returnPolicyNote(policy: ReturnPolicy | undefined): string | null {
+  if (policy === 'none') return 'This item is not eligible for return or replacement.';
+  if (policy === 'replace_only') return 'This item can be replaced, but not returned.';
+  if (policy === 'return_only') return 'This item can be returned, but not replaced.';
+  return null;
 }
 
 export function getStorefrontProduct(id: string): Product | undefined {

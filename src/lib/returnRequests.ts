@@ -27,11 +27,15 @@ export function findOrderByNumber(orders: PlacedOrder[], orderNumber: string): P
   return orders.find((order) => order.number.toLowerCase() === needle);
 }
 
-export function orderProductSummary(order?: PlacedOrder | null): { name: string; details: string } {
-  if (!order?.items.length) return { name: '', details: '' };
+export function orderProductSummary(
+  order?: PlacedOrder | null,
+  onlyItems?: PlacedOrder['items']
+): { name: string; details: string } {
+  const items = onlyItems || order?.items || [];
+  if (!items.length) return { name: '', details: '' };
   return {
-    name: order.items.map((item) => item.product.name).join(', '),
-    details: order.items
+    name: items.map((item) => item.product.name).join(', '),
+    details: items
       .map(
         (item) =>
           `${item.product.name} · ${item.selectedColor} · Size ${item.selectedSize} · Qty ${item.quantity}`

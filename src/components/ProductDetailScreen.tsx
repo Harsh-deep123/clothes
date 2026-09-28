@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Heart, ChevronDown, Ruler } from 'lucide-react';
 import { Product } from '../types';
-import { getStorefrontProducts } from '../catalog';
+import { getStorefrontProducts, returnPolicyNote } from '../catalog';
 import { ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { ProductReviewsSection } from './reviews/ProductReviewsSection';
@@ -281,6 +281,9 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               </button>
               {openAccordion.shipping && (
                 <div className="pt-3 text-sm text-[#5d5f5f] leading-relaxed font-light">
+                  {returnPolicyNote(product.returnPolicy) && (
+                    <p className="mb-2 font-medium text-[#ba1a1a]">{returnPolicyNote(product.returnPolicy)}</p>
+                  )}
                   {product.shippingAndReturns}
                 </div>
               )}
