@@ -32,7 +32,7 @@ import {
   setAuthToken,
   toLocalAccount,
 } from './lib/shopApi';
-import { getStorefrontProduct, getStorefrontProducts, priceForSize } from './catalog';
+import { getStorefrontProduct, getStorefrontProducts, imagesForColor, priceForSize } from './catalog';
 import { useCatalogTick } from './hooks/useCatalog';
 import {
   AccountTab,
@@ -481,7 +481,7 @@ export default function App() {
         items: cartItems.map((item) => ({
           productId: item.productId,
           name: item.product.name,
-          image: item.product.images[0],
+          image: imagesForColor(item.product, item.selectedColor)[0],
           selectedSize: item.selectedSize,
           selectedColor: item.selectedColor,
           quantity: item.quantity,

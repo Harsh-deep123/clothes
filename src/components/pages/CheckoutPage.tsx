@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CartItem, LocalAccount, PlacedOrder, SavedAddress, ViewScreen } from '../../types';
 import { CheckoutLocationMap } from '../checkout/CheckoutLocationMap';
 import { formatINR } from '../../lib/money';
-import { ONE_SIZE } from '../../catalog';
+import { ONE_SIZE, imagesForColor } from '../../catalog';
 import { cartGrandTotal, getDeliveryQuote } from '../../lib/delivery';
 import type { IpinfoLite } from '../../lib/ipinfo';
 import type { SavedDeliveryLocation } from '../LocationWelcomeModal';
@@ -348,7 +348,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
               {items.map((item) => (
                 <div key={item.id} className="flex gap-3 text-xs">
                   <img
-                    src={item.product.images[0]}
+                    src={imagesForColor(item.product, item.selectedColor)[0]}
                     alt=""
                     className="w-12 h-16 object-cover bg-white border border-[#cfc4c5]/20"
                   />

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Heart, ChevronDown, Ruler } from 'lucide-react';
 import { Product } from '../types';
-import { getStorefrontProducts, productHasSizes, returnPolicyNote } from '../catalog';
+import { getStorefrontProducts, imagesForColor, productHasSizes, returnPolicyNote } from '../catalog';
 import { ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { ProductReviewsSection } from './reviews/ProductReviewsSection';
@@ -48,10 +48,11 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       p.id === 'linear-silver-cuff'
   );
 
-  const imagesToDisplay = product.images.length >= 3 ? product.images : [
-    product.images[0],
-    product.images[1] || product.images[0],
-    product.images[0]
+  const galleryImages = imagesForColor(product, selectedColor);
+  const imagesToDisplay = galleryImages.length >= 3 ? galleryImages : [
+    galleryImages[0],
+    galleryImages[1] || galleryImages[0],
+    galleryImages[0]
   ];
   const outOfStock = product.sizes.every((s) => !s.available);
 

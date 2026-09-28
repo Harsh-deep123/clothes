@@ -143,7 +143,10 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
     if (!form.description.trim()) nextErrors.push('Description is required.');
     if (!(form.listPrice > 0)) nextErrors.push('Original price must be greater than 0.');
     if (form.stock < 0) nextErrors.push('Stock cannot be negative.');
-    const images = form.images.filter(Boolean);
+    const mainImages = form.images.filter(Boolean);
+    const images = mainImages.length
+      ? mainImages
+      : form.colors.find((c) => c.images?.some(Boolean))?.images?.filter(Boolean) || [];
     if (!images.length) nextErrors.push('Add at least one product image.');
     const colors = form.colors.filter((c) => c.name.trim());
     if (!colors.length) nextErrors.push('Add at least one color option.');
@@ -177,6 +180,7 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
         name: c.name.trim(),
         hex: c.hex || '#000000',
         border: c.border,
+        images: c.images?.filter(Boolean).length ? c.images.filter(Boolean) : undefined,
       })),
       sizes: sizes.length ? sizes.map((s) => ({ ...s, size: s.size.trim() })) : form.sizes,
       hasSizes: showSizes,
@@ -297,7 +301,10 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Colors</h3>
-            <p className="text-xs text-slate-400 mt-1">These swatches appear on the product page as Color: Name.</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Same product in more colors? Click Add color for each one and upload its photos — customers see those
+              photos when they pick that color.
+            </p>
           </div>
           <button
             type="button"
@@ -397,6 +404,68 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
               >
                 Remove
               </button>
+              <div className="md:col-span-4 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-slate-500">
+                    Photos for this color{color.name.trim() ? ` (${color.name.trim()})` : ''}
+                  </span>
+                  <label className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs cursor-pointer hover:bg-slate-50">
+                    Upload photos
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={async (e) => {
+                        const input = e.currentTarget;
+                        if (!input.files?.length) return;
+                        try {
+                          const urls = await readFiles(input.files);
+                          setForm((prev) => {
+                            const colors = [...prev.colors];
+                            colors[index] = {
+                              ...colors[index],
+                              images: [...(colors[index].images || []).filter(Boolean), ...urls],
+                            };
+                            return { ...prev, colors };
+                          });
+                        } catch {
+                          notify('Could not upload one or more images.', 'error');
+                        } finally {
+                          input.value = '';
+                        }
+                      }}
+                    />
+                  </label>
+                  {!color.images?.filter(Boolean).length && (
+                    <span className="text-xs text-slate-400">No photos yet — the main product images will be shown.</span>
+                  )}
+                </div>
+                {Boolean(color.images?.filter(Boolean).length) && (
+                  <div className="flex gap-2 flex-wrap">
+                    {color.images!.filter(Boolean).map((src, imageIndex) => (
+                      <div key={`${imageIndex}-${src.slice(-24)}`} className="relative">
+                        <img src={src} alt="" className="w-16 h-20 object-cover rounded-lg bg-slate-100" />
+                        <button
+                          type="button"
+                          aria-label="Remove photo"
+                          onClick={() => {
+                            const colors = [...form.colors];
+                            colors[index] = {
+                              ...colors[index],
+                              images: (colors[index].images || []).filter(Boolean).filter((_, i) => i !== imageIndex),
+                            };
+                            update({ colors });
+                          }}
+                          className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-black text-white text-xs leading-5 text-center cursor-pointer"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               {openColorPicker === index && (
                 <div className="md:col-span-4 rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pick a color</p>

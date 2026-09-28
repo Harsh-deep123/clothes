@@ -2,7 +2,7 @@ import React from 'react';
 import { X, ArrowRight, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { CartItem } from '../types';
 import { formatINR } from '../lib/money';
-import { ONE_SIZE } from '../catalog';
+import { ONE_SIZE, imagesForColor } from '../catalog';
 import type { DeliveryQuote } from '../lib/delivery';
 import { CartBillDetails } from './CartBillDetails';
 
@@ -95,7 +95,7 @@ export const ShoppingBagDrawer: React.FC<ShoppingBagDrawerProps> = ({
                 {/* Product Thumbnail */}
                 <div className="w-24 sm:w-28 h-32 sm:h-36 flex-shrink-0 bg-[#f3f3f4] relative overflow-hidden border border-[#cfc4c5]/20">
                   <img
-                    src={item.product.images[0]}
+                    src={imagesForColor(item.product, item.selectedColor)[0]}
                     alt={item.product.name}
                     className="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition-transform duration-500"
                   />

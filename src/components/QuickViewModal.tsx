@@ -4,7 +4,7 @@ import { Product } from '../types';
 import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { formatINR } from '../lib/money';
-import { priceForSize, productHasSizes } from '../catalog';
+import { imagesForColor, priceForSize, productHasSizes } from '../catalog';
 
 interface QuickViewModalProps {
   product: Product | null;
@@ -56,7 +56,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
         {/* Left: Product Image */}
         <div className="w-full md:w-1/2 aspect-[3/4] md:aspect-auto bg-[#eeeeee] relative overflow-hidden">
           <img
-            src={product.images[0]}
+            src={imagesForColor(product, selectedColor)[0]}
             alt={product.name}
             className="w-full h-full object-cover"
           />

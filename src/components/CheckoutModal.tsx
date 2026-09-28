@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, CheckCircle, ShieldCheck, ArrowRight, CreditCard, Lock } from 'lucide-react';
 import { CartItem } from '../types';
 import { formatINR } from '../lib/money';
-import { ONE_SIZE } from '../catalog';
+import { ONE_SIZE, imagesForColor } from '../catalog';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -210,7 +210,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     {items.map((item) => (
                       <div key={item.id} className="flex gap-3 text-xs">
                         <img
-                          src={item.product.images[0]}
+                          src={imagesForColor(item.product, item.selectedColor)[0]}
                           alt={item.product.name}
                           className="w-12 h-16 object-cover bg-white border border-[#cfc4c5]/20"
                         />

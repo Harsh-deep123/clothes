@@ -89,6 +89,9 @@ function catalogForStorage(items: AdminProduct[], stripDataUrls = false): AdminP
   return items.map((item) => ({
     ...item,
     images: imagesForStorage(item.images, stripDataUrls),
+    colors: item.colors.map((color) =>
+      color.images?.length ? { ...color, images: imagesForStorage(color.images, stripDataUrls) } : color,
+    ),
   }));
 }
 
@@ -158,6 +161,11 @@ export function calculateSalePrice(product: AdminProduct): number {
 }
 
 export const ONE_SIZE = 'One Size';
+
+export function imagesForColor(product: Pick<Product, 'images' | 'colors'>, colorName?: string): string[] {
+  const colorImages = product.colors.find((c) => c.name === colorName)?.images?.filter(Boolean);
+  return colorImages?.length ? colorImages : product.images;
+}
 
 export function productHasSizes(product: Pick<Product, 'hasSizes'>): boolean {
   return product.hasSizes !== false;

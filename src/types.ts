@@ -12,6 +12,8 @@ export interface Product {
     name: string;
     hex: string;
     border?: string;
+    /** Photos shown when this color is selected. Falls back to the product images when empty. */
+    images?: string[];
   }[];
   sizes: {
     size: string;
