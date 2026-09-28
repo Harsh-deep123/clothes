@@ -4,6 +4,7 @@ import { adminAssignOrder, adminListDeliveryPersons, type AdminDeliveryPerson } 
 import { adminUpdateOrderTracking } from '../lib/adminOrderTracking';
 import { TRACKING_STATUSES, normalizeTrackingStatus, type TrackingStatus } from '../lib/orderTracking';
 import { AdminDeliveryLocationModal } from './AdminDeliveryLocationModal';
+import { printDeliverySlip } from './deliverySlip';
 
 type AdminOrderCall = {
   id: string;
@@ -17,6 +18,8 @@ type AdminOrderCall = {
   deliveryAddress?: string;
   items?: Array<{ name: string; quantity: number; price: number }>;
   total: number;
+  paymentMethod?: string;
+  paymentStatus?: string;
   confirmationCallSent: boolean;
   confirmationCallStatus: NonNullable<PlacedOrder['confirmationCallStatus']>;
   confirmationCallSid?: string;
@@ -193,6 +196,17 @@ export const AdminOrders: React.FC<{ notify?: (message: string, type: 'success' 
               <span className="text-xs font-semibold uppercase px-2 py-1 rounded-lg bg-slate-100 text-slate-800">
                 {normalizeTrackingStatus(order.status || order.orderStatus)}
               </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!printDeliverySlip(order)) {
+                    notify?.('Allow pop-ups to print the delivery slip.', 'error');
+                  }
+                }}
+                className="text-xs font-semibold uppercase px-3 py-1 rounded-lg bg-slate-900 text-white"
+              >
+                Print Slip
+              </button>
             </div>
           </div>
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm">
