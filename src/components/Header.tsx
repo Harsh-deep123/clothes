@@ -40,6 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [scrolled, setScrolled] = useState(false);
   const [openMenu, setOpenMenu] = useState<'women' | 'more' | null>(null);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
+  const [healthOpen, setHealthOpen] = useState(false);
   const navItems = [
     { key: 'nav.home' as MessageKey, id: 'home', screen: 'home' as ViewScreen, category: undefined },
     { key: 'nav.newArrivals' as MessageKey, id: 'new-arrivals', screen: 'new-arrivals' as ViewScreen, category: undefined },
@@ -67,6 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
     }
     const rect = trigger.getBoundingClientRect();
     setMenuPos({ left: rect.left + rect.width / 2, top: rect.bottom + 12 });
+    setHealthOpen(false);
     setOpenMenu(menu);
   };
 
@@ -299,19 +301,24 @@ export const Header: React.FC<HeaderProps> = ({
               renderMenuPanel(
                 moreNavItems.map((item) =>
                   item.id === 'health-beauty' ? (
-                    <div key={item.id} className="border-b last:border-b-0 border-[#cfc4c5]/40 py-2">
+                    <div key={item.id} className="border-b last:border-b-0 border-[#cfc4c5]/40">
                       <button
                         type="button"
                         id={`nav-${item.id}`}
-                        onClick={() => {
-                          setOpenMenu(null);
-                          onNavigate(item.screen, item.category);
-                        }}
-                        className="block w-full text-left px-6 py-2 text-sm font-bold text-black hover:bg-[#eeeeee] cursor-pointer"
+                        aria-expanded={healthOpen}
+                        onClick={() => setHealthOpen((open) => !open)}
+                        className={`flex w-full items-center justify-between text-left px-6 py-3.5 text-sm hover:bg-[#eeeeee] cursor-pointer ${
+                          isItemActive(item) ? 'text-black font-semibold' : 'text-[#5d5f5f]'
+                        }`}
                       >
                         {t(item.key)}
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 stroke-[1.8] transition-transform ${healthOpen ? 'rotate-180' : ''}`}
+                        />
                       </button>
-                      {HEALTH_BEAUTY_SUBCATEGORIES.map((sub) => (
+                      {healthOpen && (
+                      <div className="pb-2">
+                      {[{ slug: 'health-beauty', name: 'View All' }, ...HEALTH_BEAUTY_SUBCATEGORIES].map((sub) => (
                         <button
                           key={sub.slug}
                           type="button"
@@ -326,6 +333,8 @@ export const Header: React.FC<HeaderProps> = ({
                           {sub.name}
                         </button>
                       ))}
+                      </div>
+                      )}
                     </div>
                   ) : (
                   <button
