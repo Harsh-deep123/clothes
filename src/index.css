@@ -274,21 +274,11 @@ html.dark .zayro-header-scrolled {
 }
 
 .zayro-nav-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: #cfc4c5 transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 .zayro-nav-scroll::-webkit-scrollbar {
-  height: 4px;
-}
-.zayro-nav-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-.zayro-nav-scroll::-webkit-scrollbar-thumb {
-  background: #cfc4c5;
-  border-radius: 999px;
-}
-.zayro-nav-scroll::-webkit-scrollbar-thumb:hover {
-  background: #5d5f5f;
+  display: none;
 }
 
 /* Dropdown / tooltip entrance */

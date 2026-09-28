@@ -93,6 +93,23 @@ export const Header: React.FC<HeaderProps> = ({
 
   useEffect(() => {
     const scroller = navScrollRef.current;
+    if (!scroller) return;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+      const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+      if (maxScroll <= 0) return;
+      const atStart = scroller.scrollLeft <= 0 && event.deltaY < 0;
+      const atEnd = scroller.scrollLeft >= maxScroll - 1 && event.deltaY > 0;
+      if (atStart || atEnd) return;
+      event.preventDefault();
+      scroller.scrollLeft += event.deltaY;
+    };
+    scroller.addEventListener('wheel', onWheel, { passive: false });
+    return () => scroller.removeEventListener('wheel', onWheel);
+  }, []);
+
+  useEffect(() => {
+    const scroller = navScrollRef.current;
     const active = scroller?.querySelector<HTMLElement>('.is-active');
     if (!scroller || !active) return;
     const left = active.offsetLeft;
@@ -191,11 +208,11 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      <nav className="hidden md:flex justify-center px-4 pt-3.5 pb-1.5 border-t border-[#cfc4c5]/20 bg-[#f9f9f9]">
+      <nav className="hidden md:flex justify-center px-4 py-3.5 border-t border-[#cfc4c5]/20 bg-[#f9f9f9]">
         <div
           ref={navScrollRef}
           onScroll={() => setWomenMenuOpen(false)}
-          className="zayro-nav-scroll relative flex items-center gap-x-8 overflow-x-auto whitespace-nowrap px-1 pb-2 max-w-full"
+          className="zayro-nav-scroll relative flex items-center gap-x-8 overflow-x-auto whitespace-nowrap px-1 max-w-full"
           style={navVisibleWidth ? { width: navVisibleWidth } : undefined}
         >
         {navItems.map((item) => {
