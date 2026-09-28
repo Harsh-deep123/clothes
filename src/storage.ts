@@ -1,4 +1,4 @@
-import { getCatalogProduct, toStorefrontProduct } from './catalog';
+import { getCatalogProduct, priceForSize, toStorefrontProduct } from './catalog';
 import { INITIAL_CART } from './data/products';
 import { CartItem, LocalAccount, PlacedOrder, SavedAddress } from './types';
 
@@ -58,7 +58,7 @@ export function loadCart(): CartItem[] {
       const admin = getCatalogProduct(item.productId);
       if (!admin) return null;
       const product = toStorefrontProduct(admin);
-      return { ...item, product, price: product.price };
+      return { ...item, product, price: priceForSize(product, item.selectedSize).price };
     })
     .filter(Boolean) as CartItem[];
 }

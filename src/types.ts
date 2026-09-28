@@ -16,6 +16,8 @@ export interface Product {
   sizes: {
     size: string;
     available: boolean;
+    /** Original (pre-discount) price for this size. Falls back to the product price when unset. */
+    price?: number;
   }[];
   description: string;
   detailsAndCare: string[];

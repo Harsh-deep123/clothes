@@ -106,7 +106,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
             </span>
           )}
           <p className="text-xl md:text-2xl text-[#1a1c1c] font-medium mb-3">
-            <ProductPrice product={product} decimals className="text-xl md:text-2xl font-medium" />
+            <ProductPrice product={product} size={selectedSize} decimals className="text-xl md:text-2xl font-medium" />
           </p>
           <ProductRatingSummary productId={product.id} showEmpty linkToReviews className="mb-8" />
 

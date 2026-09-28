@@ -32,7 +32,7 @@ import {
   setAuthToken,
   toLocalAccount,
 } from './lib/shopApi';
-import { getStorefrontProduct, getStorefrontProducts } from './catalog';
+import { getStorefrontProduct, getStorefrontProducts, priceForSize } from './catalog';
 import { useCatalogTick } from './hooks/useCatalog';
 import {
   AccountTab,
@@ -319,7 +319,7 @@ export default function App() {
           selectedColor,
           selectedSize,
           quantity: 1,
-          price: product.price,
+          price: priceForSize(product, selectedSize).price,
         };
         return [...prev, newItem];
     });

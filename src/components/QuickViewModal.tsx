@@ -4,6 +4,7 @@ import { Product } from '../types';
 import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { formatINR } from '../lib/money';
+import { priceForSize } from '../catalog';
 
 interface QuickViewModalProps {
   product: Product | null;
@@ -73,7 +74,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
             </h2>
             <ProductRatingSummary productId={product.id} showEmpty className="mb-3" />
             <p className="text-lg font-semibold text-black mb-4">
-              <ProductPrice product={product} decimals className="text-lg font-semibold" />
+              <ProductPrice product={product} size={selectedSize} decimals className="text-lg font-semibold" />
             </p>
             <p className="text-xs text-[#5d5f5f] leading-relaxed mb-6 font-light line-clamp-3">
               {product.description}
@@ -134,7 +135,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
               }}
               className="w-full py-3.5 bg-black text-white text-xs uppercase tracking-[0.2em] font-semibold hover:bg-neutral-800 transition-colors"
             >
-              Add to Bag • {formatINR(product.price)}
+              Add to Bag • {formatINR(priceForSize(product, selectedSize).price)}
             </button>
             <button
               onClick={() => {

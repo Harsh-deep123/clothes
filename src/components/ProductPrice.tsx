@@ -1,29 +1,33 @@
 import React from 'react';
 import { Product } from '../types';
 import { formatINR } from '../lib/money';
+import { priceForSize } from '../catalog';
 
 interface ProductPriceProps {
   product: Product;
   className?: string;
   decimals?: boolean;
+  size?: string;
 }
 
 export const ProductPrice: React.FC<ProductPriceProps> = ({
   product,
   className = '',
   decimals,
+  size,
 }) => {
-  if (product.isSale && product.originalPrice && product.originalPrice > product.price) {
+  const { price, originalPrice } = priceForSize(product, size);
+  if (product.isSale && originalPrice && originalPrice > price) {
     return (
       <span className={`inline-flex items-baseline gap-2 ${className}`}>
         <span className="line-through text-[#5d5f5f] font-normal">
-          {formatINR(product.originalPrice, decimals)}
+          {formatINR(originalPrice, decimals)}
         </span>
-        <span className="text-[#ba1a1a]">{formatINR(product.price, decimals)}</span>
+        <span className="text-[#ba1a1a]">{formatINR(price, decimals)}</span>
       </span>
     );
   }
-  return <span className={className}>{formatINR(product.price, decimals)}</span>;
+  return <span className={className}>{formatINR(price, decimals)}</span>;
 };
 
 export const ProductBadges: React.FC<{ product: Product; className?: string }> = ({

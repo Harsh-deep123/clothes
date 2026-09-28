@@ -100,6 +100,9 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
     if (!images.length) nextErrors.push('Add at least one product image.');
     const colors = form.colors.filter((c) => c.name.trim());
     if (!colors.length) nextErrors.push('Add at least one color option.');
+    const sizes = form.sizes.filter((s) => s.size.trim());
+    if (!sizes.length) nextErrors.push('Add at least one size.');
+    if (new Set(sizes.map((s) => s.size.trim())).size !== sizes.length) nextErrors.push('Each size must be unique.');
     if (form.discountEnabled && (!form.discountValue || form.discountValue <= 0)) {
       nextErrors.push('Enter a discount value, or disable the discount.');
     }
@@ -125,6 +128,7 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
         hex: c.hex || '#000000',
         border: c.border,
       })),
+      sizes: sizes.map((s) => ({ ...s, size: s.size.trim() })),
       detailsAndCare: form.detailsAndCare.filter(Boolean),
       price: form.saleEnabled && form.discountEnabled ? salePrice : form.listPrice,
       isSale: Boolean(form.saleEnabled && form.discountEnabled && form.discountValue),
@@ -383,6 +387,87 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
         <p className="md:col-span-3 text-xs text-slate-500">
           {form.stock <= 0 ? 'Status: Out of stock' : form.stock <= 5 ? 'Status: Low stock' : 'Status: In stock'}
         </p>
+      </section>
+
+      <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Sizes & price per size</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Leave the price empty to use the original price ({formatINR(form.listPrice || 0, true)}). Sale discount
+              applies to every size.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="px-4 py-2 rounded-xl border border-slate-200 text-sm w-fit"
+            onClick={() => update({ sizes: [...form.sizes, { size: '', available: true }] })}
+          >
+            Add size
+          </button>
+        </div>
+        {form.sizes.map((s, index) => (
+          <div
+            key={index}
+            className="grid grid-cols-[1fr_1fr_auto_auto] gap-3 items-end border border-slate-100 rounded-xl p-3"
+          >
+            <label className="block">
+              <span className="text-xs text-slate-500">Size</span>
+              <input
+                value={s.size}
+                onChange={(e) => {
+                  const sizes = [...form.sizes];
+                  sizes[index] = { ...sizes[index], size: e.target.value.toUpperCase() };
+                  update({ sizes });
+                }}
+                placeholder="M"
+                className={fieldClass}
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-slate-500">Price (₹)</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={s.price ?? ''}
+                placeholder={String(form.listPrice || '')}
+                onChange={(e) => {
+                  const value = e.target.value === '' ? undefined : Number(e.target.value);
+                  const sizes = [...form.sizes];
+                  sizes[index] = { ...sizes[index], price: value && value > 0 ? value : undefined };
+                  update({ sizes });
+                }}
+                className={fieldClass}
+              />
+            </label>
+            <label className="flex items-center gap-2 h-10">
+              <input
+                type="checkbox"
+                checked={s.available}
+                onChange={(e) => {
+                  const sizes = [...form.sizes];
+                  sizes[index] = { ...sizes[index], available: e.target.checked };
+                  update({ sizes });
+                }}
+              />
+              <span className="text-sm">Available</span>
+            </label>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-xl border border-slate-200 text-sm h-10"
+              onClick={() => {
+                if (form.sizes.length <= 1) {
+                  notify('Keep at least one size.', 'error');
+                  return;
+                }
+                update({ sizes: form.sizes.filter((_, i) => i !== index) });
+              }}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
       </section>
 
       <section className="bg-white border border-slate-200 rounded-2xl p-5 grid md:grid-cols-2 gap-4">

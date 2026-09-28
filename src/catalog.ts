@@ -173,6 +173,18 @@ export function getCatalogProduct(id: string): AdminProduct | undefined {
   return catalog.find((p) => p.id === id);
 }
 
+export function priceForSize(product: Product, size?: string): { price: number; originalPrice?: number } {
+  const sizeList = product.sizes.find((s) => s.size === size)?.price;
+  if (!sizeList || !(sizeList > 0)) {
+    return { price: product.price, originalPrice: product.originalPrice };
+  }
+  if (!product.isSale) return { price: sizeList };
+  const discount = product.discountValue || 0;
+  const sale =
+    product.discountType === 'amount' ? sizeList - discount : sizeList * (1 - discount / 100);
+  return { price: Math.max(0, Number(sale.toFixed(2))), originalPrice: sizeList };
+}
+
 export const RETURN_POLICY_OPTIONS: Array<{ value: ReturnPolicy; label: string }> = [
   { value: 'return_and_replace', label: 'Return & Replacement allowed' },
   { value: 'replace_only', label: 'Replacement only (no return)' },
