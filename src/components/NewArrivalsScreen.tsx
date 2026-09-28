@@ -47,8 +47,9 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     { label: 'Cargos', value: 'cargos' },
     { label: 'Footwear', value: 'shoes' },
     { label: 'Accessories', value: 'accessories' },
+    { label: "Women's Clothing", value: 'women' },
     ...adminCategories
-      .filter((c) => !['jackets', 't-shirts', 'shirts', 'jeans', 'bottomwear', 'cargos', 'shoes', 'accessories'].includes(c.slug))
+      .filter((c) => !['jackets', 't-shirts', 'shirts', 'jeans', 'bottomwear', 'cargos', 'shoes', 'accessories', 'women'].includes(c.slug))
       .map((c) => ({ label: c.name, value: c.slug })),
   ];
 

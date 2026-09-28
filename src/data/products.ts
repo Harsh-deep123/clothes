@@ -40,6 +40,14 @@ export const CATEGORIES: CategoryInfo[] = [
     image: '/images/shirt-sage.jpg',
     description: 'Crisp poplins and technical silk-cotton blend button-downs',
     gridSpan: 'md:col-span-2'
+  },
+  {
+    id: 'women',
+    name: "Women's Clothing",
+    slug: 'women',
+    image: '/images/new-standard-editorial.jpg',
+    description: 'Tops, dresses, co-ords and everyday essentials for women',
+    gridSpan: 'md:col-span-1'
   }
 ];
 

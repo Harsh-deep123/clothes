@@ -35,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
     { key: 'nav.home' as MessageKey, id: 'home', screen: 'home' as ViewScreen, category: undefined },
     { key: 'nav.newArrivals' as MessageKey, id: 'new-arrivals', screen: 'new-arrivals' as ViewScreen, category: undefined },
     { key: 'nav.men' as MessageKey, id: 'men', screen: 'new-arrivals' as ViewScreen, category: 'all' },
+    { key: 'nav.women' as MessageKey, id: 'women', screen: 'category' as ViewScreen, category: 'women' },
     { key: 'nav.tshirts' as MessageKey, id: 't-shirts', screen: 'category' as ViewScreen, category: 't-shirts' },
     { key: 'nav.shirts' as MessageKey, id: 'shirts', screen: 'category' as ViewScreen, category: 'shirts' },
     { key: 'nav.jeans' as MessageKey, id: 'jeans', screen: 'category' as ViewScreen, category: 'jeans' },

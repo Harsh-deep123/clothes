@@ -126,6 +126,10 @@ function persist() {
 
 let catalog: AdminProduct[] = loadRawCatalog();
 let categoryList: CategoryInfo[] = readJson<CategoryInfo[] | null>(CATEGORIES_KEY, null) || [...CATEGORIES];
+const womenCategory = CATEGORIES.find((c) => c.slug === 'women');
+if (womenCategory && !categoryList.some((c) => c.slug === 'women')) {
+  categoryList = [...categoryList, womenCategory];
+}
 
 if (!localStorage.getItem(CATALOG_KEY)) {
   persist();

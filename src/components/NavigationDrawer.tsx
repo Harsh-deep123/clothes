@@ -70,6 +70,13 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
       category: 'all',
     },
     {
+      key: 'nav.women' as MessageKey,
+      id: 'women',
+      icon: User,
+      screen: 'category' as ViewScreen,
+      category: 'women',
+    },
+    {
       key: 'nav.tshirts' as MessageKey,
       id: 't-shirts',
       icon: Shirt,
