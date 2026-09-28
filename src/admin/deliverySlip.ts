@@ -12,8 +12,6 @@ const CODE128_PATTERNS = [
   '114131', '311141', '411131', '211412', '211214', '211232', '2331112',
 ];
 
-import QRCode from 'qrcode';
-
 const START_B = 104;
 const STOP = 106;
 
@@ -142,16 +140,7 @@ function slipLines(order: DeliverySlipOrder): SlipLine[] {
   }));
 }
 
-const DEFAULT_PUBLIC_SITE_URL = 'https://clothes-three-delta.vercel.app';
-
-export function orderTrackingUrl(orderId: string): string {
-  const configured = import.meta.env.VITE_PUBLIC_SITE_URL?.trim();
-  const isLocal = /^(localhost|127\.|192\.168\.|10\.)/.test(window.location.hostname);
-  const base = (configured || (isLocal ? DEFAULT_PUBLIC_SITE_URL : window.location.origin)).replace(/\/+$/, '');
-  return `${base}/account/orders?track=${encodeURIComponent(orderId)}`;
-}
-
-export function deliverySlipHtml(order: DeliverySlipOrder, qrSvg = ''): string {
+export function deliverySlipHtml(order: DeliverySlipOrder): string {
   const orderId = order.orderId || order.number || order.id;
   const awb = (order.trackingId || '').trim() || orderId;
   const cod = isCod(order);
@@ -210,9 +199,6 @@ export function deliverySlipHtml(order: DeliverySlipOrder, qrSvg = ''): string {
   .brand { display: flex; align-items: center; justify-content: center; }
   .brand span { font-family: Georgia, 'Times New Roman', serif; font-size: 26px; font-weight: 700; letter-spacing: 4px; }
   .brand small { display: block; text-align: center; font-size: 8px; letter-spacing: 2px; }
-  .qr { margin-top: 1.5mm; text-align: center; }
-  .qr svg { width: 19mm; height: 19mm; display: block; margin: 0 auto; }
-  .qr small { font-size: 6.5px; letter-spacing: 0.5px; margin-top: 0.5mm; }
   .meta { font-family: 'Times New Roman', serif; font-size: 10px; border-collapse: collapse; }
   .meta td { padding: 0.6mm 1.5mm 0.6mm 0; vertical-align: top; }
   .bc { text-align: center; font-family: 'Times New Roman', serif; }
@@ -248,10 +234,7 @@ export function deliverySlipHtml(order: DeliverySlipOrder, qrSvg = ''): string {
         Phone No.: ${esc(order.customerPhone)}
       </div>
     </div>
-    <div class="brand" style="flex:0 0 32%"><div>
-      <span>ZAYRO</span><small>COLLECTION</small>
-      ${qrSvg ? `<div class="qr">${qrSvg}<small>Scan to track order</small></div>` : ''}
-    </div></div>
+    <div class="brand" style="flex:0 0 32%"><div><span>ZAYRO</span><small>COLLECTION</small></div></div>
   </div>
 
   <div class="sec split">
@@ -316,18 +299,10 @@ export function deliverySlipHtml(order: DeliverySlipOrder, qrSvg = ''): string {
 }
 
 export function printDeliverySlip(order: DeliverySlipOrder): boolean {
-  // Opened synchronously inside the click handler so pop-up blockers allow it.
   const win = window.open('', '_blank', 'width=480,height=760');
   if (!win) return false;
-  win.document.write('<p style="font-family:Arial;padding:16px">Preparing label…</p>');
-
-  const orderId = order.orderId || order.number || order.id;
-  void QRCode.toString(orderTrackingUrl(orderId), { type: 'svg', margin: 0, errorCorrectionLevel: 'M' })
-    .catch(() => '')
-    .then((qrSvg) => {
-      win.document.open();
-      win.document.write(deliverySlipHtml(order, qrSvg));
-      win.document.close();
-    });
+  win.document.open();
+  win.document.write(deliverySlipHtml(order));
+  win.document.close();
   return true;
 }
