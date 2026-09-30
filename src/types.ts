@@ -39,6 +39,8 @@ export interface Product {
   returnPolicy?: ReturnPolicy;
   /** When false, customers don't pick a size (e.g. perfumes, decor). */
   hasSizes?: boolean;
+  /** When false, customers don't pick a color. */
+  hasColors?: boolean;
 }
 
 export type ReturnPolicy = 'return_and_replace' | 'replace_only' | 'return_only' | 'none';

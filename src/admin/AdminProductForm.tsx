@@ -80,6 +80,7 @@ const emptyProduct = (): AdminProduct => ({
   saleEnd: '',
   returnPolicy: 'return_and_replace',
   hasSizes: true,
+  hasColors: true,
 });
 
 function readFiles(files: FileList): Promise<string[]> {
@@ -148,8 +149,9 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
       ? mainImages
       : form.colors.find((c) => c.images?.some(Boolean))?.images?.filter(Boolean) || [];
     if (!images.length) nextErrors.push('Add at least one product image.');
+    const showColors = form.hasColors !== false;
     const colors = form.colors.filter((c) => c.name.trim());
-    if (!colors.length) nextErrors.push('Add at least one color option.');
+    if (showColors && !colors.length) nextErrors.push('Add at least one color option.');
     const showSizes = form.hasSizes !== false;
     const sizes = form.sizes.filter((s) => s.size.trim());
     if (showSizes && !sizes.length) nextErrors.push('Add at least one size.');
@@ -176,14 +178,17 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
       ...form,
       id,
       images,
-      colors: colors.map((c) => ({
-        name: c.name.trim(),
-        hex: c.hex || '#000000',
-        border: c.border,
-        images: c.images?.filter(Boolean).length ? c.images.filter(Boolean) : undefined,
-      })),
+      colors: colors.length
+        ? colors.map((c) => ({
+            name: c.name.trim(),
+            hex: c.hex || '#000000',
+            border: c.border,
+            images: c.images?.filter(Boolean).length ? c.images.filter(Boolean) : undefined,
+          }))
+        : form.colors,
       sizes: sizes.length ? sizes.map((s) => ({ ...s, size: s.size.trim() })) : form.sizes,
       hasSizes: showSizes,
+      hasColors: showColors,
       detailsAndCare: form.detailsAndCare.filter(Boolean),
       price: form.saleEnabled && form.discountEnabled ? salePrice : form.listPrice,
       isSale: Boolean(form.saleEnabled && form.discountEnabled && form.discountValue),
@@ -302,22 +307,37 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Colors</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Same product in more colors? Click Add color for each one and upload its photos — customers see those
-              photos when they pick that color.
+              {form.hasColors !== false
+                ? 'Same product in more colors? Click Add color for each one and upload its photos — customers see those photos when they pick that color.'
+                : 'Color options are hidden. Customers buy this product without choosing a color.'}
             </p>
           </div>
-          <button
-            type="button"
-            className="px-4 py-2 rounded-xl border border-slate-200 text-sm w-fit"
-            onClick={() =>
-              update({
-                colors: [...form.colors, { name: '', hex: '#888888' }],
-              })
-            }
-          >
-            Add color
-          </button>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.hasColors !== false}
+                onChange={(e) => update({ hasColors: e.target.checked })}
+              />
+              Show color options
+            </label>
+            {form.hasColors !== false && (
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-sm w-fit"
+                onClick={() =>
+                  update({
+                    colors: [...form.colors, { name: '', hex: '#888888' }],
+                  })
+                }
+              >
+                Add color
+              </button>
+            )}
+          </div>
         </div>
+        {form.hasColors !== false && (
+        <>
 
         <div className="rounded-xl bg-slate-50 px-4 py-3">
           <p className="text-xs uppercase tracking-[0.15em] font-semibold text-slate-700 mb-3">
@@ -509,6 +529,8 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
             </div>
           ))}
         </div>
+        </>
+        )}
       </section>
 
       <section className="bg-white border border-slate-200 rounded-2xl p-5 grid md:grid-cols-3 gap-4">

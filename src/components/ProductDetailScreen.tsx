@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Heart, ChevronDown, Ruler } from 'lucide-react';
 import { Product } from '../types';
-import { getStorefrontProducts, imagesForColor, productHasSizes, returnPolicyNote } from '../catalog';
+import { getStorefrontProducts, imagesForColor, productHasColors, productHasSizes, returnPolicyNote } from '../catalog';
 import { ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { ProductReviewsSection } from './reviews/ProductReviewsSection';
@@ -112,6 +112,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
           <ProductRatingSummary productId={product.id} showEmpty linkToReviews className="mb-8" />
 
           {/* Color Selector */}
+          {productHasColors(product) && (
           <div className="mb-8">
             <p className="text-xs uppercase tracking-[0.15em] font-semibold text-black mb-3">
               Color: <span className="font-normal text-[#5d5f5f]">{selectedColor}</span>
@@ -140,6 +141,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               })}
             </div>
           </div>
+          )}
 
           {/* Size Selector */}
           {productHasSizes(product) && (

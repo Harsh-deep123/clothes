@@ -13,6 +13,7 @@ import {
   isAddedStoreCategory,
   isWomenCategory,
 } from '../data/products';
+import { productHasColors } from '../catalog';
 
 interface NewArrivalsScreenProps {
   onSelectProduct: (product: Product) => void;
@@ -111,7 +112,7 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
 
     // Color filter
     if (selectedColor !== 'all') {
-      list = list.filter((p) => p.colors.some((c) => c.name === selectedColor));
+      list = list.filter((p) => productHasColors(p) && p.colors.some((c) => c.name === selectedColor));
     }
 
     // Price range filter

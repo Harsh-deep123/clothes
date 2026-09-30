@@ -171,6 +171,10 @@ export function productHasSizes(product: Pick<Product, 'hasSizes'>): boolean {
   return product.hasSizes !== false;
 }
 
+export function productHasColors(product: Pick<Product, 'hasColors'>): boolean {
+  return product.hasColors !== false;
+}
+
 export function toStorefrontProduct(product: AdminProduct): Product {
   const live = isSaleLive(product);
   const listPrice = product.listPrice || product.price;

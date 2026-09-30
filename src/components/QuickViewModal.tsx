@@ -4,7 +4,7 @@ import { Product } from '../types';
 import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { formatINR } from '../lib/money';
-import { imagesForColor, priceForSize, productHasSizes } from '../catalog';
+import { imagesForColor, priceForSize, productHasColors, productHasSizes } from '../catalog';
 
 interface QuickViewModalProps {
   product: Product | null;
@@ -81,6 +81,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
             </p>
 
             {/* Colors */}
+            {productHasColors(product) && (
             <div className="mb-5">
               <span className="text-[11px] uppercase tracking-wider font-semibold text-black block mb-2">
                 Color: {selectedColor}
@@ -100,6 +101,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
                 ))}
               </div>
             </div>
+            )}
 
             {/* Sizes */}
             {productHasSizes(product) && (

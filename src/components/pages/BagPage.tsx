@@ -2,7 +2,7 @@ import React from 'react';
 import { Minus, Plus, ShoppingBag } from 'lucide-react';
 import { CartItem, ViewScreen } from '../../types';
 import { formatINR } from '../../lib/money';
-import { ONE_SIZE, imagesForColor } from '../../catalog';
+import { ONE_SIZE, imagesForColor, productHasColors } from '../../catalog';
 import type { DeliveryQuote } from '../../lib/delivery';
 import { CartBillDetails } from '../CartBillDetails';
 
@@ -70,7 +70,9 @@ export const BagPage: React.FC<BagPageProps> = ({
                       <h2 className="text-base text-black font-medium">{item.product.name}</h2>
                       <span className="font-semibold shrink-0">{formatINR(item.price * item.quantity)}</span>
                     </div>
-                    <p className="text-sm text-[#5d5f5f] mt-1">Color: {item.selectedColor}</p>
+                    {productHasColors(item.product) && (
+                      <p className="text-sm text-[#5d5f5f] mt-1">Color: {item.selectedColor}</p>
+                    )}
                     {item.selectedSize !== ONE_SIZE && (
                       <p className="text-sm text-[#5d5f5f]">Size: {item.selectedSize}</p>
                     )}
