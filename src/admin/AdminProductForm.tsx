@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Eye, Star, Trash2, Upload } from 'lucide-react';
 import {
   AdminProduct,
   calculateSalePrice,
@@ -11,7 +12,6 @@ import type { ReturnPolicy } from '../types';
 import { useAdminCategories } from '../hooks/useCatalog';
 import { formatINR } from '../lib/money';
 import { ImageLightbox } from '../components/ImageLightbox';
-import { ZoomIn } from 'lucide-react';
 
 interface AdminProductFormProps {
   productId?: string | null;
@@ -82,7 +82,6 @@ const emptyProduct = (): AdminProduct => ({
   saleEnd: '',
   returnPolicy: 'return_and_replace',
   hasSizes: true,
-  hasColors: true,
 });
 
 function readFiles(files: FileList): Promise<string[]> {
@@ -153,9 +152,8 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
       ? mainImages
       : form.colors.find((c) => c.images?.some(Boolean))?.images?.filter(Boolean) || [];
     if (!images.length) nextErrors.push('Add at least one product image.');
-    const showColors = form.hasColors !== false;
     const colors = form.colors.filter((c) => c.name.trim());
-    if (showColors && !colors.length) nextErrors.push('Add at least one color option.');
+    if (!colors.length) nextErrors.push('Add at least one color option.');
     const showSizes = form.hasSizes !== false;
     const sizes = form.sizes.filter((s) => s.size.trim());
     if (showSizes && !sizes.length) nextErrors.push('Add at least one size.');
@@ -182,17 +180,14 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
       ...form,
       id,
       images,
-      colors: colors.length
-        ? colors.map((c) => ({
-            name: c.name.trim(),
-            hex: c.hex || '#000000',
-            border: c.border,
-            images: c.images?.filter(Boolean).length ? c.images.filter(Boolean) : undefined,
-          }))
-        : form.colors,
+      colors: colors.map((c) => ({
+        name: c.name.trim(),
+        hex: c.hex || '#000000',
+        border: c.border,
+        images: c.images?.filter(Boolean).length ? c.images.filter(Boolean) : undefined,
+      })),
       sizes: sizes.length ? sizes.map((s) => ({ ...s, size: s.size.trim() })) : form.sizes,
       hasSizes: showSizes,
-      hasColors: showColors,
       detailsAndCare: form.detailsAndCare.filter(Boolean),
       price: form.saleEnabled && form.discountEnabled ? salePrice : form.listPrice,
       isSale: Boolean(form.saleEnabled && form.discountEnabled && form.discountValue),
@@ -254,11 +249,11 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
       </section>
 
       <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Images</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Product images</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Upload clear photos. Click Preview to zoom and check product detail before publishing.
+              Upload clear photos customers can zoom on the product page. The first image is the main storefront photo.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -269,7 +264,8 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
             >
               Add image URL
             </button>
-            <label className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm cursor-pointer hover:bg-slate-800">
+            <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm cursor-pointer hover:bg-slate-800">
+              <Upload className="w-4 h-4" />
               Upload images
               <input
                 type="file"
@@ -282,6 +278,7 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
                   try {
                     const urls = await readFiles(input.files);
                     update({ images: [...form.images.filter(Boolean), ...urls] });
+                    notify(`${urls.length} image${urls.length === 1 ? '' : 's'} added.`, 'success');
                   } catch {
                     notify('Could not upload one or more images.', 'error');
                   } finally {
@@ -294,47 +291,77 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
         </div>
 
         {previewImages.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {previewImages.map((src, previewIdx) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {form.images.map((src, index) => {
+              if (!src) return null;
+              const previewIdx = form.images.slice(0, index + 1).filter(Boolean).length - 1;
+              return (
                 <div
-                  key={`${previewIdx}-${src.slice(-32)}`}
-                  className="group relative rounded-xl border border-slate-200 overflow-hidden bg-slate-100 aspect-[3/4]"
+                  key={`${index}-${src.slice(-32)}`}
+                  className="group relative rounded-xl border border-slate-200 bg-slate-50 overflow-hidden"
                 >
-                  <img src={src} alt={`Product ${previewIdx + 1}`} className="w-full h-full object-cover" />
-                  <div className="absolute inset-x-0 bottom-0 flex gap-1 p-2 bg-gradient-to-t from-black/70 to-transparent opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewIndex(previewIdx)}
+                    className="block w-full aspect-[3/4] cursor-zoom-in text-left"
+                    aria-label={`Preview image ${previewIdx + 1}`}
+                  >
+                    <img src={src} alt={`Product ${previewIdx + 1}`} className="w-full h-full object-cover" />
+                    <span className="pointer-events-none absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors" />
+                    <span className="pointer-events-none absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/75 text-white text-[10px] uppercase tracking-wider px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Eye className="w-3 h-3" />
+                      Zoom
+                    </span>
+                  </button>
+                  {previewIdx === 0 && (
+                    <span className="absolute top-2 left-2 rounded-full bg-black text-white text-[10px] uppercase tracking-wider px-2 py-0.5">
+                      Main
+                    </span>
+                  )}
+                  <div className="flex border-t border-slate-200">
+                    <button
+                      type="button"
+                      disabled={previewIdx === 0}
+                      onClick={() => {
+                        const images = [...form.images];
+                        const [item] = images.splice(index, 1);
+                        images.unshift(item);
+                        update({ images });
+                      }}
+                      className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-2 text-xs text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title="Set as main image"
+                    >
+                      <Star className="w-3.5 h-3.5" />
+                      Main
+                    </button>
                     <button
                       type="button"
                       onClick={() => setPreviewIndex(previewIdx)}
-                      className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg bg-white text-slate-900 text-xs font-medium py-1.5 cursor-pointer"
+                      className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-2 text-xs text-slate-600 hover:bg-white border-l border-slate-200 cursor-pointer"
                     >
-                      <ZoomIn className="w-3.5 h-3.5" />
+                      <Eye className="w-3.5 h-3.5" />
                       Preview
                     </button>
                     <button
                       type="button"
-                      onClick={() => update({ images: previewImages.filter((_, i) => i !== previewIdx) })}
-                      className="rounded-lg bg-white/90 text-slate-900 text-xs px-2.5 py-1.5 cursor-pointer"
+                      onClick={() => {
+                        update({ images: form.images.filter((_, i) => i !== index) });
+                        setPreviewIndex(null);
+                      }}
+                      className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-2 text-xs text-red-600 hover:bg-red-50 border-l border-slate-200 cursor-pointer"
                     >
+                      <Trash2 className="w-3.5 h-3.5" />
                       Remove
                     </button>
                   </div>
-                  {previewIdx === 0 && (
-                    <span className="absolute top-2 left-2 bg-black text-white text-[10px] uppercase tracking-wider px-2 py-0.5">
-                      Main
-                    </span>
-                  )}
                 </div>
-            ))}
-          </div>
-        )}
-
-        {!previewImages.length && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-            No images yet. Use Upload images or paste an image URL below.
+              );
+            })}
           </div>
         )}
 
         <div className="space-y-2">
+          <p className="text-xs text-slate-500">Image URLs</p>
           {form.images.map((url, index) => (
             <div key={index} className="flex gap-2">
               <input
@@ -344,7 +371,7 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
                   images[index] = e.target.value;
                   update({ images });
                 }}
-                placeholder="Image URL or leave blank after upload"
+                placeholder="https://… or upload above"
                 className={fieldClass + ' mt-0'}
               />
               <button
@@ -356,13 +383,16 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
               </button>
             </div>
           ))}
+          {!form.images.length && (
+            <p className="text-xs text-slate-400">No images yet. Upload files or paste an image URL.</p>
+          )}
         </div>
 
-        {previewIndex !== null && (
+        {previewIndex !== null && previewImages.length > 0 && (
           <ImageLightbox
             images={previewImages}
             startIndex={previewIndex}
-            alt={form.name || 'Product'}
+            alt={form.name || 'Product image'}
             onClose={() => setPreviewIndex(null)}
           />
         )}
@@ -373,37 +403,22 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Colors</h3>
             <p className="text-xs text-slate-400 mt-1">
-              {form.hasColors !== false
-                ? 'Same product in more colors? Click Add color for each one and upload its photos — customers see those photos when they pick that color.'
-                : 'Color options are hidden. Customers buy this product without choosing a color.'}
+              Same product in more colors? Click Add color for each one and upload its photos — customers see those
+              photos when they pick that color.
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={form.hasColors !== false}
-                onChange={(e) => update({ hasColors: e.target.checked })}
-              />
-              Show color options
-            </label>
-            {form.hasColors !== false && (
-              <button
-                type="button"
-                className="px-4 py-2 rounded-xl border border-slate-200 text-sm w-fit"
-                onClick={() =>
-                  update({
-                    colors: [...form.colors, { name: '', hex: '#888888' }],
-                  })
-                }
-              >
-                Add color
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            className="px-4 py-2 rounded-xl border border-slate-200 text-sm w-fit"
+            onClick={() =>
+              update({
+                colors: [...form.colors, { name: '', hex: '#888888' }],
+              })
+            }
+          >
+            Add color
+          </button>
         </div>
-        {form.hasColors !== false && (
-        <>
 
         <div className="rounded-xl bg-slate-50 px-4 py-3">
           <p className="text-xs uppercase tracking-[0.15em] font-semibold text-slate-700 mb-3">
@@ -595,8 +610,6 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
             </div>
           ))}
         </div>
-        </>
-        )}
       </section>
 
       <section className="bg-white border border-slate-200 rounded-2xl p-5 grid md:grid-cols-3 gap-4">

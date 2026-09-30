@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Heart, ChevronDown, Ruler } from 'lucide-react';
 import { Product } from '../types';
-import { getStorefrontProducts, imagesForColor, productHasColors, productHasSizes, returnPolicyNote } from '../catalog';
+import { getStorefrontProducts, imagesForColor, productHasSizes, returnPolicyNote } from '../catalog';
 import { ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { ProductReviewsSection } from './reviews/ProductReviewsSection';
@@ -35,7 +35,6 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
     details: true,
     shipping: false,
   });
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const toggleAccordion = (section: string) => {
     setOpenAccordion((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -50,15 +49,23 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       p.id === 'linear-silver-cuff'
   );
 
-  const galleryImages = imagesForColor(product, selectedColor).filter(Boolean);
-  const imagesToDisplay = galleryImages.length >= 3
-    ? galleryImages
-    : [
-        galleryImages[0],
-        galleryImages[1] || galleryImages[0],
-        galleryImages[0],
-      ].filter(Boolean);
+  const galleryImages = imagesForColor(product, selectedColor);
+  const zoomGallery = useMemo(
+    () => Array.from(new Set(imagesForColor(product, selectedColor).filter(Boolean))),
+    [product, selectedColor],
+  );
+  const imagesToDisplay = galleryImages.length >= 3 ? galleryImages : [
+    galleryImages[0],
+    galleryImages[1] || galleryImages[0],
+    galleryImages[0]
+  ];
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const outOfStock = product.sizes.every((s) => !s.available);
+
+  const openZoom = (src: string) => {
+    const index = zoomGallery.indexOf(src);
+    setLightboxIndex(index >= 0 ? index : 0);
+  };
 
   return (
     <main className="pt-24 md:pt-32 pb-24 max-w-[1440px] mx-auto px-5 md:px-16 w-full">
@@ -68,56 +75,31 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         <div className="md:col-span-7 flex flex-col gap-4">
           {/* Main 3:4 Image */}
           <div className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
-            {imagesToDisplay[0] && (
-              <ZoomableImage
-                src={imagesToDisplay[0]}
-                alt={`${product.name} Main View`}
-                onOpen={() => setLightboxIndex(0)}
-              />
-            )}
+            <ZoomableImage
+              src={imagesToDisplay[0]}
+              alt={`${product.name} Main View`}
+              onOpen={() => openZoom(imagesToDisplay[0])}
+            />
           </div>
 
-          {/* Detail Sub-images */}
+          {/* 2 Detail Sub-images */}
           <div className="grid grid-cols-2 gap-4">
-            {[1, 2].map((slot) => (
-              <div
-                key={slot}
-                className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20"
-              >
-                {imagesToDisplay[slot] && (
-                  <ZoomableImage
-                    src={imagesToDisplay[slot]}
-                    alt={`${product.name} Detail ${slot}`}
-                    onOpen={() => setLightboxIndex(Math.min(slot, galleryImages.length - 1))}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          {galleryImages.length > 3 && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {galleryImages.slice(3).map((src, i) => (
-                <button
-                  key={`${i}-${src.slice(-24)}`}
-                  type="button"
-                  onClick={() => setLightboxIndex(i + 3)}
-                  className="shrink-0 w-16 h-20 border border-[#cfc4c5]/30 overflow-hidden cursor-zoom-in"
-                >
-                  <img src={src} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
+            <div className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
+              <ZoomableImage
+                src={imagesToDisplay[1]}
+                alt={`${product.name} Detail 1`}
+                onOpen={() => openZoom(imagesToDisplay[1])}
+              />
             </div>
-          )}
+            <div className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
+              <ZoomableImage
+                src={imagesToDisplay[2]}
+                alt={`${product.name} Detail 2`}
+                onOpen={() => openZoom(imagesToDisplay[2])}
+              />
+            </div>
+          </div>
         </div>
-
-        {lightboxIndex !== null && (
-          <ImageLightbox
-            images={galleryImages}
-            startIndex={lightboxIndex}
-            alt={product.name}
-            onClose={() => setLightboxIndex(null)}
-          />
-        )}
 
         {/* Right Column: Sticky Product Purchase Form (md:col-span-5) */}
         <div className="md:col-span-5 md:pl-6 flex flex-col pt-4 md:pt-0 sticky top-32 h-fit">
@@ -141,7 +123,6 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
           <ProductRatingSummary productId={product.id} showEmpty linkToReviews className="mb-8" />
 
           {/* Color Selector */}
-          {productHasColors(product) && (
           <div className="mb-8">
             <p className="text-xs uppercase tracking-[0.15em] font-semibold text-black mb-3">
               Color: <span className="font-normal text-[#5d5f5f]">{selectedColor}</span>
@@ -170,7 +151,6 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               })}
             </div>
           </div>
-          )}
 
           {/* Size Selector */}
           {productHasSizes(product) && (
@@ -363,6 +343,15 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
           ))}
         </div>
       </section>
+
+      {lightboxIndex !== null && zoomGallery.length > 0 && (
+        <ImageLightbox
+          images={zoomGallery}
+          startIndex={lightboxIndex}
+          alt={product.name}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
     </main>
   );
 };

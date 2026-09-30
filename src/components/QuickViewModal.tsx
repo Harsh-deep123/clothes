@@ -4,7 +4,7 @@ import { Product } from '../types';
 import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { formatINR } from '../lib/money';
-import { imagesForColor, priceForSize, productHasColors, productHasSizes } from '../catalog';
+import { imagesForColor, priceForSize, productHasSizes } from '../catalog';
 import { ImageLightbox, ZoomableImage } from './ImageLightbox';
 
 interface QuickViewModalProps {
@@ -58,23 +58,13 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
 
         {/* Left: Product Image */}
         <div className="w-full md:w-1/2 aspect-[3/4] md:aspect-auto bg-[#eeeeee] relative overflow-hidden">
-          {quickImages[0] && (
-            <ZoomableImage
-              src={quickImages[0]}
-              alt={product.name}
-              onOpen={() => setLightboxOpen(true)}
-            />
-          )}
+          <ZoomableImage
+            src={quickImages[0]}
+            alt={product.name}
+            onOpen={() => setLightboxOpen(true)}
+          />
           <ProductBadges product={product} />
         </div>
-        {lightboxOpen && (
-          <ImageLightbox
-            images={quickImages}
-            startIndex={0}
-            alt={product.name}
-            onClose={() => setLightboxOpen(false)}
-          />
-        )}
 
         {/* Right: Info & Purchase Controls */}
         <div className="w-full md:w-1/2 p-6 md:p-8 flex flex-col justify-between overflow-y-auto">
@@ -94,7 +84,6 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
             </p>
 
             {/* Colors */}
-            {productHasColors(product) && (
             <div className="mb-5">
               <span className="text-[11px] uppercase tracking-wider font-semibold text-black block mb-2">
                 Color: {selectedColor}
@@ -114,7 +103,6 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
                 ))}
               </div>
             </div>
-            )}
 
             {/* Sizes */}
             {productHasSizes(product) && (
@@ -167,6 +155,15 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
           </div>
         </div>
       </div>
+
+      {lightboxOpen && quickImages.length > 0 && (
+        <ImageLightbox
+          images={quickImages}
+          startIndex={0}
+          alt={product.name}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </div>
   );
 };
