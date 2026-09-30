@@ -5,6 +5,7 @@ import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { formatINR } from '../lib/money';
 import { imagesForColor, priceForSize, productHasColors, productHasSizes } from '../catalog';
+import { ImageLightbox, ZoomableImage } from './ImageLightbox';
 
 interface QuickViewModalProps {
   product: Product | null;
@@ -29,6 +30,8 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
   const [selectedSize, setSelectedSize] = useState<string>(
     product.sizes.find((s) => s.available)?.size || product.sizes[0]?.size || 'M'
   );
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const quickImages = imagesForColor(product, selectedColor).filter(Boolean);
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
@@ -55,13 +58,23 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
 
         {/* Left: Product Image */}
         <div className="w-full md:w-1/2 aspect-[3/4] md:aspect-auto bg-[#eeeeee] relative overflow-hidden">
-          <img
-            src={imagesForColor(product, selectedColor)[0]}
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
+          {quickImages[0] && (
+            <ZoomableImage
+              src={quickImages[0]}
+              alt={product.name}
+              onOpen={() => setLightboxOpen(true)}
+            />
+          )}
           <ProductBadges product={product} />
         </div>
+        {lightboxOpen && (
+          <ImageLightbox
+            images={quickImages}
+            startIndex={0}
+            alt={product.name}
+            onClose={() => setLightboxOpen(false)}
+          />
+        )}
 
         {/* Right: Info & Purchase Controls */}
         <div className="w-full md:w-1/2 p-6 md:p-8 flex flex-col justify-between overflow-y-auto">

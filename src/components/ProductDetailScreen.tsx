@@ -5,6 +5,7 @@ import { getStorefrontProducts, imagesForColor, productHasColors, productHasSize
 import { ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { ProductReviewsSection } from './reviews/ProductReviewsSection';
+import { ImageLightbox, ZoomableImage } from './ImageLightbox';
 
 interface ProductDetailScreenProps {
   product: Product;
@@ -34,6 +35,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
     details: true,
     shipping: false,
   });
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const toggleAccordion = (section: string) => {
     setOpenAccordion((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -48,12 +50,14 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       p.id === 'linear-silver-cuff'
   );
 
-  const galleryImages = imagesForColor(product, selectedColor);
-  const imagesToDisplay = galleryImages.length >= 3 ? galleryImages : [
-    galleryImages[0],
-    galleryImages[1] || galleryImages[0],
-    galleryImages[0]
-  ];
+  const galleryImages = imagesForColor(product, selectedColor).filter(Boolean);
+  const imagesToDisplay = galleryImages.length >= 3
+    ? galleryImages
+    : [
+        galleryImages[0],
+        galleryImages[1] || galleryImages[0],
+        galleryImages[0],
+      ].filter(Boolean);
   const outOfStock = product.sizes.every((s) => !s.available);
 
   return (
@@ -64,31 +68,56 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         <div className="md:col-span-7 flex flex-col gap-4">
           {/* Main 3:4 Image */}
           <div className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
-            <img
-              src={imagesToDisplay[0]}
-              alt={`${product.name} Main View`}
-              className="w-full h-full object-cover object-center"
-            />
+            {imagesToDisplay[0] && (
+              <ZoomableImage
+                src={imagesToDisplay[0]}
+                alt={`${product.name} Main View`}
+                onOpen={() => setLightboxIndex(0)}
+              />
+            )}
           </div>
 
-          {/* 2 Detail Sub-images */}
+          {/* Detail Sub-images */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
-              <img
-                src={imagesToDisplay[1]}
-                alt={`${product.name} Detail 1`}
-                className="w-full h-full object-cover object-center"
-              />
-            </div>
-            <div className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
-              <img
-                src={imagesToDisplay[2]}
-                alt={`${product.name} Detail 2`}
-                className="w-full h-full object-cover object-center"
-              />
-            </div>
+            {[1, 2].map((slot) => (
+              <div
+                key={slot}
+                className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20"
+              >
+                {imagesToDisplay[slot] && (
+                  <ZoomableImage
+                    src={imagesToDisplay[slot]}
+                    alt={`${product.name} Detail ${slot}`}
+                    onOpen={() => setLightboxIndex(Math.min(slot, galleryImages.length - 1))}
+                  />
+                )}
+              </div>
+            ))}
           </div>
+          {galleryImages.length > 3 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {galleryImages.slice(3).map((src, i) => (
+                <button
+                  key={`${i}-${src.slice(-24)}`}
+                  type="button"
+                  onClick={() => setLightboxIndex(i + 3)}
+                  className="shrink-0 w-16 h-20 border border-[#cfc4c5]/30 overflow-hidden cursor-zoom-in"
+                >
+                  <img src={src} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
+        {lightboxIndex !== null && (
+          <ImageLightbox
+            images={galleryImages}
+            startIndex={lightboxIndex}
+            alt={product.name}
+            onClose={() => setLightboxIndex(null)}
+          />
+        )}
 
         {/* Right Column: Sticky Product Purchase Form (md:col-span-5) */}
         <div className="md:col-span-5 md:pl-6 flex flex-col pt-4 md:pt-0 sticky top-32 h-fit">

@@ -10,6 +10,8 @@ import {
 import type { ReturnPolicy } from '../types';
 import { useAdminCategories } from '../hooks/useCatalog';
 import { formatINR } from '../lib/money';
+import { ImageLightbox } from '../components/ImageLightbox';
+import { ZoomIn } from 'lucide-react';
 
 interface AdminProductFormProps {
   productId?: string | null;
@@ -112,6 +114,8 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
 
   const update = (patch: Partial<AdminProduct>) => setForm((prev) => ({ ...prev, ...patch }));
   const [openColorPicker, setOpenColorPicker] = useState<number | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const previewImages = form.images.filter(Boolean);
 
   const setColorAt = (index: number, hex: string, presetName?: string) => {
     setForm((prev) => {
@@ -249,57 +253,119 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
         </label>
       </section>
 
-      <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Images</h3>
-        {form.images.map((url, index) => (
-          <div key={index} className="flex gap-2">
-            <input
-              value={url}
-              onChange={(e) => {
-                const images = [...form.images];
-                images[index] = e.target.value;
-                update({ images });
-              }}
-              placeholder="Image URL"
-              className={fieldClass + ' mt-0'}
-            />
+      <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Images</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Upload clear photos. Click Preview to zoom and check product detail before publishing.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="px-3 rounded-xl border border-slate-200 text-sm"
-              onClick={() => update({ images: form.images.filter((_, i) => i !== index) })}
+              className="px-4 py-2 rounded-xl border border-slate-200 text-sm"
+              onClick={() => update({ images: [...form.images, ''] })}
             >
-              Remove
+              Add image URL
             </button>
+            <label className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm cursor-pointer hover:bg-slate-800">
+              Upload images
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={async (e) => {
+                  const input = e.currentTarget;
+                  if (!input.files?.length) return;
+                  try {
+                    const urls = await readFiles(input.files);
+                    update({ images: [...form.images.filter(Boolean), ...urls] });
+                  } catch {
+                    notify('Could not upload one or more images.', 'error');
+                  } finally {
+                    input.value = '';
+                  }
+                }}
+              />
+            </label>
           </div>
-        ))}
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className="px-4 py-2 rounded-xl border border-slate-200 text-sm" onClick={() => update({ images: [...form.images, ''] })}>
-            Add image URL
-          </button>
-          <label className="px-4 py-2 rounded-xl border border-slate-200 text-sm cursor-pointer">
-            Upload images
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={async (e) => {
-                if (!e.target.files?.length) return;
-                try {
-                  const urls = await readFiles(e.target.files);
-                  update({ images: [...form.images.filter(Boolean), ...urls] });
-                } catch {
-                  notify('Could not upload one or more images.', 'error');
-                }
-              }}
-            />
-          </label>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {form.images.filter(Boolean).map((src) => (
-            <img key={src.slice(0, 40)} src={src} alt="" className="w-16 h-20 object-cover rounded-lg bg-slate-100" />
+
+        {previewImages.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {previewImages.map((src, previewIdx) => (
+                <div
+                  key={`${previewIdx}-${src.slice(-32)}`}
+                  className="group relative rounded-xl border border-slate-200 overflow-hidden bg-slate-100 aspect-[3/4]"
+                >
+                  <img src={src} alt={`Product ${previewIdx + 1}`} className="w-full h-full object-cover" />
+                  <div className="absolute inset-x-0 bottom-0 flex gap-1 p-2 bg-gradient-to-t from-black/70 to-transparent opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewIndex(previewIdx)}
+                      className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg bg-white text-slate-900 text-xs font-medium py-1.5 cursor-pointer"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => update({ images: previewImages.filter((_, i) => i !== previewIdx) })}
+                      className="rounded-lg bg-white/90 text-slate-900 text-xs px-2.5 py-1.5 cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {previewIdx === 0 && (
+                    <span className="absolute top-2 left-2 bg-black text-white text-[10px] uppercase tracking-wider px-2 py-0.5">
+                      Main
+                    </span>
+                  )}
+                </div>
+            ))}
+          </div>
+        )}
+
+        {!previewImages.length && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+            No images yet. Use Upload images or paste an image URL below.
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {form.images.map((url, index) => (
+            <div key={index} className="flex gap-2">
+              <input
+                value={url}
+                onChange={(e) => {
+                  const images = [...form.images];
+                  images[index] = e.target.value;
+                  update({ images });
+                }}
+                placeholder="Image URL or leave blank after upload"
+                className={fieldClass + ' mt-0'}
+              />
+              <button
+                type="button"
+                className="px-3 rounded-xl border border-slate-200 text-sm"
+                onClick={() => update({ images: form.images.filter((_, i) => i !== index) })}
+              >
+                Remove
+              </button>
+            </div>
           ))}
         </div>
+
+        {previewIndex !== null && (
+          <ImageLightbox
+            images={previewImages}
+            startIndex={previewIndex}
+            alt={form.name || 'Product'}
+            onClose={() => setPreviewIndex(null)}
+          />
+        )}
       </section>
 
       <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
