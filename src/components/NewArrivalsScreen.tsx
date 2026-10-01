@@ -13,7 +13,6 @@ import {
   isAddedStoreCategory,
   isWomenCategory,
 } from '../data/products';
-import { productHasColors } from '../catalog';
 
 interface NewArrivalsScreenProps {
   onSelectProduct: (product: Product) => void;
@@ -112,7 +111,7 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
 
     // Color filter
     if (selectedColor !== 'all') {
-      list = list.filter((p) => productHasColors(p) && p.colors.some((c) => c.name === selectedColor));
+      list = list.filter((p) => p.colors.some((c) => c.name === selectedColor));
     }
 
     // Price range filter
@@ -284,23 +283,19 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-14 mb-20">
-          {displayedProducts.map((product, idx) => {
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5 mb-20">
+          {displayedProducts.map((product) => {
             const isWishlisted = wishlist.includes(product.id);
-            // Replicating the exact design layout: odd columns on desktop get mt-12 staggering
-            const isStaggered = idx % 2 === 1;
 
             return (
               <div
                 key={product.id}
                 id={`product-card-${product.id}`}
                 onClick={() => onSelectProduct(product)}
-                className={`group block relative cursor-pointer ${
-                  isStaggered ? 'md:mt-12' : ''
-                }`}
+                className="group block relative cursor-pointer"
               >
                 {/* Image Container */}
-                <div className="relative aspect-[3/4] overflow-hidden bg-[#eeeeee] mb-5 border border-[#cfc4c5]/20">
+                <div className="relative aspect-square overflow-hidden bg-[#eeeeee] mb-3 border border-[#cfc4c5]/20">
                   <img
                     src={product.images[0]}
                     alt={product.name}
@@ -308,7 +303,7 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
                   />
 
                   {/* Badges */}
-                  <ProductBadges product={product} className="absolute top-4 left-4 flex flex-col gap-1 items-start" />
+                  <ProductBadges product={product} className="absolute top-2 left-2 flex flex-col gap-1 items-start" />
 
                   {/* Wishlist Button */}
                   <button
@@ -318,26 +313,26 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
                       e.stopPropagation();
                       onToggleWishlist(product.id);
                     }}
-                    className={`absolute top-4 right-4 p-2 rounded-full backdrop-blur-md transition-all active:scale-90 ${
+                    className={`absolute top-2 right-2 p-1.5 rounded-full backdrop-blur-md transition-all active:scale-90 ${
                       isWishlisted
                         ? 'bg-black text-white'
                         : 'bg-white/70 text-black hover:bg-white'
                     }`}
                   >
                     <Heart
-                      className="w-4 h-4"
+                      className="w-3.5 h-3.5"
                       fill={isWishlisted ? '#ffffff' : 'transparent'}
                     />
                   </button>
 
                   {/* Quick View Strip */}
-                  <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/40 via-transparent to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/40 via-transparent to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onQuickView(product);
                       }}
-                      className="w-full bg-white/95 text-black text-[11px] py-2 font-semibold tracking-widest uppercase hover:bg-black hover:text-white transition-colors"
+                      className="w-full bg-white/95 text-black text-[10px] py-1.5 font-semibold tracking-widest uppercase hover:bg-black hover:text-white transition-colors"
                     >
                       Quick View
                     </button>
@@ -345,17 +340,15 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
                 </div>
 
                 {/* Metadata */}
-                <div className="flex justify-between items-start pt-1">
-                  <div>
-                    <h3 className="font-serif-luxury text-xl md:text-2xl text-black font-normal group-hover:underline underline-offset-4">
-                      {product.name}
-                    </h3>
-                    <ProductRatingSummary productId={product.id} showEmpty className="mt-1" />
-                    <p className="text-xs text-[#5d5f5f] mt-1 font-light">
-                      {product.subtitle || product.material}
-                    </p>
-                  </div>
-                  <ProductPrice product={product} className="text-lg md:text-xl font-medium text-black" />
+                <div className="flex flex-col gap-0.5 pt-0.5">
+                  <h3 className="font-serif-luxury text-sm md:text-base text-black font-normal group-hover:underline underline-offset-4 line-clamp-2">
+                    {product.name}
+                  </h3>
+                  <ProductRatingSummary productId={product.id} showEmpty className="mt-0.5" />
+                  <p className="text-[11px] text-[#5d5f5f] font-light line-clamp-1">
+                    {product.subtitle || product.material}
+                  </p>
+                  <ProductPrice product={product} className="text-sm md:text-base font-medium text-black mt-1" />
                 </div>
               </div>
             );
