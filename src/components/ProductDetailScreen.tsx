@@ -64,9 +64,9 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
     <main className="pt-24 md:pt-32 pb-24 max-w-[1440px] mx-auto px-5 md:px-16 w-full">
       {/* Product Details Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-14 mt-4 md:mt-8">
-        {/* Left Column: Image Gallery (md:col-span-7) */}
-        <div className="md:col-span-7 flex flex-col gap-3">
-          <div className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
+        {/* Left Column: Image Gallery */}
+        <div className="md:col-span-5 flex flex-col gap-3 md:max-w-[420px]">
+          <div className="w-full max-w-[360px] md:max-w-full aspect-square max-h-[420px] mx-auto md:mx-0 bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
             {activeImage && (
               <img
                 src={activeImage}
@@ -98,8 +98,8 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
           )}
         </div>
 
-        {/* Right Column: Sticky Product Purchase Form (md:col-span-5) */}
-        <div className="md:col-span-5 md:pl-6 flex flex-col pt-4 md:pt-0 sticky top-32 h-fit">
+        {/* Right Column: Sticky Product Purchase Form */}
+        <div className="md:col-span-7 md:pl-6 flex flex-col pt-4 md:pt-0 sticky top-32 h-fit">
           {/* Breadcrumb */}
           <div className="text-xs uppercase tracking-[0.15em] text-[#5d5f5f] mb-3 font-medium">
             {product.breadcrumb}
