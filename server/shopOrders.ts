@@ -125,7 +125,9 @@ export async function createShopOrder(input: CreateShopOrderInput): Promise<Stor
       deliveryAddress: addressLine(input.shippingAddress),
       shipping: input.shippingAddress,
       items: input.items.map((item) => ({
+        productId: item.productId,
         name: item.name,
+        image: item.image || '',
         quantity: item.quantity,
         price: item.price,
       })),

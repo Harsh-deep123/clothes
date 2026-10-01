@@ -76,13 +76,17 @@ function orderHasProduct(
   },
   productId: string
 ) {
-  if ((order.products || []).some((item) => item.productId === productId)) return true;
-  if ((order.items || []).some((item) => item.productId === productId)) return true;
-  const catalog = PRODUCTS.find((item) => item.id === productId);
-  if (!catalog) return false;
-  const name = catalog.name.trim().toLowerCase();
-  if ((order.products || []).some((item) => (item.name || '').trim().toLowerCase() === name)) return true;
-  return (order.items || []).some((item) => (item.name || '').trim().toLowerCase() === name);
+  const id = productId.trim();
+  if (!id) return false;
+  if ((order.products || []).some((item) => (item.productId || '').trim() === id)) return true;
+  if ((order.items || []).some((item) => (item.productId || '').trim() === id)) return true;
+  const catalog = PRODUCTS.find((item) => item.id === id);
+  const name = (catalog?.name || '').trim().toLowerCase();
+  if (name) {
+    if ((order.products || []).some((item) => (item.name || '').trim().toLowerCase() === name)) return true;
+    if ((order.items || []).some((item) => (item.name || '').trim().toLowerCase() === name)) return true;
+  }
+  return false;
 }
 
 function isOrderConfirmed(order: { orderStatus?: string; status?: string }) {
@@ -156,7 +160,11 @@ export async function savePurchaseRating(input: {
 
   const order = await findStoredOrder(orderId);
   const catalog = PRODUCTS.find((item) => item.id === productId);
-  const productInOrder = order ? orderHasProduct(order, productId) : Boolean(catalog);
+  // Confirmation page sends orderId + productId. Admin-created products are not in
+  // the seed catalog, and local-only orders may not be in Mongo yet — still allow rating.
+  const productInOrder = order
+    ? orderHasProduct(order, productId)
+    : Boolean(productId && orderId);
   if (!productInOrder) {
     return { error: 'This rating must match a confirmed order.', status: 403 };
   }
