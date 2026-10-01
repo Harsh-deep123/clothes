@@ -5,6 +5,7 @@ import { getStorefrontProducts, imagesForColor, productHasSizes, returnPolicyNot
 import { ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { ProductReviewsSection } from './reviews/ProductReviewsSection';
+import { HoverZoomImage } from './ImageLightbox';
 
 interface ProductDetailScreenProps {
   product: Product;
@@ -68,11 +69,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         <div className="md:col-span-5 flex flex-col gap-3 md:max-w-[420px]">
           <div className="w-full max-w-[360px] md:max-w-full aspect-square max-h-[420px] mx-auto md:mx-0 bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
             {activeImage && (
-              <img
-                src={activeImage}
-                alt={`${product.name} view`}
-                className="w-full h-full object-cover object-center"
-              />
+              <HoverZoomImage src={activeImage} alt={`${product.name} view`} />
             )}
           </div>
 

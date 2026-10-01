@@ -160,3 +160,62 @@ export const ZoomableImage: React.FC<ZoomableImageProps> = ({
     )}
   </button>
 );
+
+interface HoverZoomImageProps {
+  src: string;
+  alt: string;
+  scale?: number;
+}
+
+/** In-place hover/tap zoom — no fullscreen popup. */
+export const HoverZoomImage: React.FC<HoverZoomImageProps> = ({ src, alt, scale = 2.25 }) => {
+  const [origin, setOrigin] = useState('50% 50%');
+  const [active, setActive] = useState(false);
+
+  const updateOrigin = (clientX: number, clientY: number, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100));
+    const y = Math.min(100, Math.max(0, ((clientY - rect.top) / rect.height) * 100));
+    setOrigin(`${x}% ${y}%`);
+  };
+
+  return (
+    <div
+      className="group relative h-full w-full overflow-hidden cursor-zoom-in touch-none select-none"
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      onMouseMove={(e) => updateOrigin(e.clientX, e.clientY, e.currentTarget)}
+      onClick={() => setActive((v) => !v)}
+      onTouchStart={(e) => {
+        const t = e.touches[0];
+        if (!t) return;
+        setActive(true);
+        updateOrigin(t.clientX, t.clientY, e.currentTarget);
+      }}
+      onTouchMove={(e) => {
+        const t = e.touches[0];
+        if (!t) return;
+        updateOrigin(t.clientX, t.clientY, e.currentTarget);
+      }}
+      onTouchEnd={() => setActive(false)}
+      role="img"
+      aria-label={`${alt} — hover or tap to zoom`}
+    >
+      <img
+        src={src}
+        alt={alt}
+        draggable={false}
+        className="h-full w-full object-cover object-center will-change-transform transition-transform duration-100 ease-out"
+        style={{
+          transform: active ? `scale(${scale})` : 'scale(1)',
+          transformOrigin: origin,
+        }}
+      />
+      <span className="pointer-events-none absolute bottom-2 right-2 inline-flex items-center gap-1 bg-black/65 text-white text-[10px] uppercase tracking-[0.12em] px-2 py-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+        <ZoomIn className="w-3 h-3" />
+        Zoom
+      </span>
+    </div>
+  );
+};
