@@ -151,13 +151,29 @@ export function isSaleLive(product: AdminProduct, now = new Date()): boolean {
   return true;
 }
 
+export function applyDiscount(
+  base: number,
+  discountType: DiscountType,
+  discountValue: number,
+): number {
+  const list = Number(base) || 0;
+  const value = Number(discountValue) || 0;
+  if (!(list > 0) || !(value > 0)) return list;
+  if (discountType === 'amount') {
+    return Math.max(0, Number((list - value).toFixed(2)));
+  }
+  return Math.max(0, Number((list * (1 - Math.min(value, 100) / 100)).toFixed(2)));
+}
+
+/** Sale price from list + discount fields (ignores Sale ON / dates — for admin preview). */
 export function calculateSalePrice(product: AdminProduct): number {
   const base = product.listPrice || product.price;
-  if (!isSaleLive(product)) return base;
-  if (product.discountType === 'amount') {
-    return Math.max(0, Number((base - product.discountValue).toFixed(2)));
-  }
-  return Math.max(0, Number((base * (1 - product.discountValue / 100)).toFixed(2)));
+  return applyDiscount(base, product.discountType, product.discountValue);
+}
+
+export function discountPercentOff(listPrice: number, salePrice: number): number {
+  if (!(listPrice > 0) || salePrice >= listPrice) return 0;
+  return Math.max(1, Math.round(((listPrice - salePrice) / listPrice) * 100));
 }
 
 export const ONE_SIZE = 'One Size';
@@ -169,10 +185,6 @@ export function imagesForColor(product: Pick<Product, 'images' | 'colors'>, colo
 
 export function productHasSizes(product: Pick<Product, 'hasSizes'>): boolean {
   return product.hasSizes !== false;
-}
-
-export function productHasColors(product: Pick<Product, 'hasColors'>): boolean {
-  return product.hasColors !== false;
 }
 
 export function toStorefrontProduct(product: AdminProduct): Product {
