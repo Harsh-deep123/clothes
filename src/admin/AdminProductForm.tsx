@@ -791,11 +791,11 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
           <input
             type="number"
             min="0"
-            step="0.01"
-            value={form.discountValue}
+            step="1"
+            value={Number.isFinite(form.discountValue) ? Math.round(form.discountValue) : 0}
             onChange={(e) =>
               update({
-                discountValue: Number(e.target.value),
+                discountValue: Math.round(Number(e.target.value) || 0),
                 discountEnabled: true,
               })
             }
@@ -824,9 +824,9 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
           <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Customer price preview</p>
           {(form.listPrice || 0) > 0 && form.discountValue > 0 && salePrice < (form.listPrice || 0) ? (
             <>
-              <AmazonSalePrice listPrice={form.listPrice || 0} salePrice={salePrice} decimals />
+              <AmazonSalePrice listPrice={form.listPrice || 0} salePrice={salePrice} />
               <p className="text-xs text-slate-500">
-                Was {formatINR(form.listPrice || 0, true)} · save {discountPercentOff(form.listPrice || 0, salePrice)}%
+                Was {formatINR(form.listPrice || 0)} · save {discountPercentOff(form.listPrice || 0, salePrice)}%
                 {!form.saleEnabled ? (
                   <span className="text-amber-700"> — turn Sale ON to show this on the storefront.</span>
                 ) : (
