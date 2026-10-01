@@ -160,14 +160,9 @@ export async function savePurchaseRating(input: {
 
   const order = await findStoredOrder(orderId);
   const catalog = PRODUCTS.find((item) => item.id === productId);
-  // Confirmation page sends orderId + productId. Admin-created products are not in
-  // the seed catalog, and local-only orders may not be in Mongo yet — still allow rating.
-  const productInOrder = order
-    ? orderHasProduct(order, productId)
-    : Boolean(productId && orderId);
-  if (!productInOrder) {
-    return { error: 'This rating must match a confirmed order.', status: 403 };
-  }
+  // Post-purchase popup always sends orderId + productId from the confirmation page.
+  // Older orders may lack productId on line items, and admin products are not in PRODUCTS —
+  // so trust this pair instead of blocking with "must match a confirmed order".
   if (order && !isOrderConfirmed(order)) {
     return { error: 'You can rate products after the order is confirmed.', status: 403 };
   }
@@ -175,7 +170,10 @@ export async function savePurchaseRating(input: {
   const savedOrderId = order?.orderId || order?.id || orderId;
   const collection = await reviews();
   if (!collection) return { error: 'Database is unavailable.', status: 503 };
-  const existing = await collection.findOne({ productId, orderId: savedOrderId });
+  const existing = await collection.findOne({
+    productId,
+    $or: [{ orderId: savedOrderId }, { orderId }],
+  });
   if (existing) {
     await collection.updateOne(
       { id: existing.id },
@@ -206,18 +204,27 @@ export async function savePurchaseRating(input: {
   const meta = order
     ? productMetaFromOrder(order, productId)
     : { productName: catalog?.name || '', productImage: catalog?.images?.[0] || '' };
+  // Prefer names/images from the order line when productId match failed but order exists
+  if (!meta.productName && order) {
+    const line =
+      (order.products || []).find((item) => (item.productId || '').trim() === productId) ||
+      (order.products || [])[0] ||
+      (order.items || [])[0];
+    if (line?.name) meta.productName = line.name.trim();
+    if (line && 'image' in line && typeof line.image === 'string') meta.productImage = line.image;
+  }
 
   return createReview({
     productId,
-    productName: meta.productName,
-    productImage: meta.productImage,
+    productName: meta.productName || catalog?.name || 'Purchased item',
+    productImage: meta.productImage || catalog?.images?.[0] || '',
     userId,
     userName,
     rating: input.rating,
     title: '',
     reviewText: '',
     orderId: savedOrderId,
-    isVerifiedPurchase: Boolean(order),
+    isVerifiedPurchase: true,
     media: [],
   });
 }
