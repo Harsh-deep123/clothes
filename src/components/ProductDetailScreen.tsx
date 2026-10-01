@@ -1,11 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Heart, ChevronDown, Ruler } from 'lucide-react';
 import { Product } from '../types';
 import { getStorefrontProducts, imagesForColor, productHasSizes, returnPolicyNote } from '../catalog';
 import { ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { ProductReviewsSection } from './reviews/ProductReviewsSection';
-import { ImageLightbox, ZoomableImage } from './ImageLightbox';
 
 interface ProductDetailScreenProps {
   product: Product;
@@ -49,56 +48,54 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       p.id === 'linear-silver-cuff'
   );
 
-  const galleryImages = imagesForColor(product, selectedColor);
   const zoomGallery = useMemo(
     () => Array.from(new Set(imagesForColor(product, selectedColor).filter(Boolean))),
     [product, selectedColor],
   );
-  const imagesToDisplay = galleryImages.length >= 3 ? galleryImages : [
-    galleryImages[0],
-    galleryImages[1] || galleryImages[0],
-    galleryImages[0]
-  ];
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const outOfStock = product.sizes.every((s) => !s.available);
+  const activeImage = zoomGallery[Math.min(activeImageIndex, Math.max(zoomGallery.length - 1, 0))] || zoomGallery[0];
 
-  const openZoom = (src: string) => {
-    const index = zoomGallery.indexOf(src);
-    setLightboxIndex(index >= 0 ? index : 0);
-  };
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [selectedColor, product.id]);
 
   return (
     <main className="pt-24 md:pt-32 pb-24 max-w-[1440px] mx-auto px-5 md:px-16 w-full">
       {/* Product Details Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-14 mt-4 md:mt-8">
         {/* Left Column: Image Gallery (md:col-span-7) */}
-        <div className="md:col-span-7 flex flex-col gap-4">
-          {/* Main 3:4 Image */}
+        <div className="md:col-span-7 flex flex-col gap-3">
           <div className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
-            <ZoomableImage
-              src={imagesToDisplay[0]}
-              alt={`${product.name} Main View`}
-              onOpen={() => openZoom(imagesToDisplay[0])}
-            />
+            {activeImage && (
+              <img
+                src={activeImage}
+                alt={`${product.name} view`}
+                className="w-full h-full object-cover object-center"
+              />
+            )}
           </div>
 
-          {/* 2 Detail Sub-images */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
-              <ZoomableImage
-                src={imagesToDisplay[1]}
-                alt={`${product.name} Detail 1`}
-                onOpen={() => openZoom(imagesToDisplay[1])}
-              />
+          {zoomGallery.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              {zoomGallery.map((src, index) => (
+                <button
+                  key={`${index}-${src.slice(-24)}`}
+                  type="button"
+                  onClick={() => setActiveImageIndex(index)}
+                  aria-label={`Thumbnail ${index + 1}`}
+                  aria-current={index === activeImageIndex}
+                  className={`h-20 w-16 shrink-0 overflow-hidden border bg-[#eeeeee] cursor-pointer transition-colors ${
+                    index === activeImageIndex
+                      ? 'border-black ring-1 ring-black'
+                      : 'border-[#cfc4c5]/40 hover:border-black'
+                  }`}
+                >
+                  <img src={src} alt="" className="h-full w-full object-cover object-center" />
+                </button>
+              ))}
             </div>
-            <div className="w-full aspect-[3/4] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20">
-              <ZoomableImage
-                src={imagesToDisplay[2]}
-                alt={`${product.name} Detail 2`}
-                onOpen={() => openZoom(imagesToDisplay[2])}
-              />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Right Column: Sticky Product Purchase Form (md:col-span-5) */}
@@ -344,14 +341,6 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         </div>
       </section>
 
-      {lightboxIndex !== null && zoomGallery.length > 0 && (
-        <ImageLightbox
-          images={zoomGallery}
-          startIndex={lightboxIndex}
-          alt={product.name}
-          onClose={() => setLightboxIndex(null)}
-        />
-      )}
     </main>
   );
 };
