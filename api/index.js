@@ -110,9 +110,119 @@ var init_mongo = __esm({
 });
 
 // src/data/products.ts
-var PRODUCTS, INITIAL_CART;
+var WOMEN_SUBCATEGORIES, HEALTH_BEAUTY_SUBCATEGORIES, STORE_SECTION_CATEGORIES, CATEGORIES, PRODUCTS, INITIAL_CART;
 var init_products = __esm({
   "src/data/products.ts"() {
+    WOMEN_SUBCATEGORIES = [
+      { slug: "women-kurti", name: "Kurti" },
+      { slug: "women-lehenga", name: "Lehenga" },
+      { slug: "women-saree", name: "Sarees" },
+      { slug: "women-suit-sets", name: "Suit Sets" },
+      { slug: "women-blouse", name: "Blouse" },
+      { slug: "women-co-ord-sets", name: "Co-Ord Sets" },
+      { slug: "women-gown", name: "Gown" },
+      { slug: "women-indo-western", name: "Indo Western" },
+      { slug: "women-pakistani-suit", name: "Pakistani Suit" },
+      { slug: "women-salwar-suits", name: "Salwar Suits" },
+      { slug: "women-plus-size", name: "Plus Size" }
+    ];
+    HEALTH_BEAUTY_SUBCATEGORIES = [
+      { slug: "beauty-health-wellness", name: "Health and Wellness" },
+      { slug: "beauty-perfumes", name: "Perfumes and Fragrances" },
+      { slug: "beauty-nail-care", name: "Nail Care" },
+      { slug: "beauty-massagers", name: "Massagers" },
+      { slug: "beauty-skincare", name: "Skincare" },
+      { slug: "beauty-makeup", name: "Makeup and Organizers" },
+      { slug: "beauty-hair-care", name: "Hair Care" },
+      { slug: "beauty-personal-care", name: "Personal Care" }
+    ];
+    STORE_SECTION_CATEGORIES = [
+      { slug: "home-decor", name: "Home & Decor" },
+      { slug: "auto-electrical", name: "Auto & Electrical Parts" },
+      { slug: "accessories", name: "Accessories" }
+    ];
+    CATEGORIES = [
+      {
+        id: "jackets",
+        name: "Jackets & Outerwear",
+        slug: "jackets",
+        image: "/images/camel-suede-jacket.jpg",
+        description: "Structured tailoring and protective luxury outerwear",
+        gridSpan: "md:col-span-2 md:row-span-2"
+      },
+      {
+        id: "t-shirts",
+        name: "T-Shirts",
+        slug: "t-shirts",
+        image: "/images/black-tshirt.jpg",
+        description: "Heavyweight organic cottons with boxy architectural cuts",
+        gridSpan: "md:col-span-1"
+      },
+      {
+        id: "jeans",
+        name: "Jeans",
+        slug: "jeans",
+        image: "/images/stacked-jeans.jpg",
+        description: "Japanese selvedge denim in raw indigo and charcoal washes",
+        gridSpan: "md:col-span-1"
+      },
+      {
+        id: "cargos",
+        name: "Cargos",
+        slug: "cargos",
+        image: "/images/khaki-cargos.jpg",
+        description: "Tapered utilitarian trousers with recessed geometric pockets",
+        gridSpan: "md:col-span-1"
+      },
+      {
+        id: "shirts",
+        name: "Shirts",
+        slug: "shirts",
+        image: "/images/shirt-sage.jpg",
+        description: "Crisp poplins and technical silk-cotton blend button-downs",
+        gridSpan: "md:col-span-2"
+      },
+      {
+        id: "women",
+        name: "Women's Clothing",
+        slug: "women",
+        image: "/images/new-standard-editorial.jpg",
+        description: "Tops, dresses, co-ords and everyday essentials for women",
+        gridSpan: "md:col-span-1"
+      },
+      ...WOMEN_SUBCATEGORIES.map((sub) => ({
+        id: sub.slug,
+        name: sub.name,
+        slug: sub.slug,
+        image: "/images/new-standard-editorial.jpg",
+        description: `Women's ${sub.name}`,
+        gridSpan: "md:col-span-1"
+      })),
+      ...STORE_SECTION_CATEGORIES.map((section) => ({
+        id: section.slug,
+        name: section.name,
+        slug: section.slug,
+        image: "/images/new-standard-editorial.jpg",
+        description: section.name,
+        gridSpan: "md:col-span-1"
+      })),
+      {
+        id: "health-beauty",
+        name: "Health & Beauty",
+        slug: "health-beauty",
+        image: "/images/new-standard-editorial.jpg",
+        description: "Wellness, fragrances, skincare, makeup, hair and personal care",
+        gridSpan: "md:col-span-1"
+      },
+      ...HEALTH_BEAUTY_SUBCATEGORIES.map((sub) => ({
+        id: sub.slug,
+        name: sub.name,
+        slug: sub.slug,
+        image: "/images/new-standard-editorial.jpg",
+        description: sub.name,
+        gridSpan: "md:col-span-1"
+      }))
+    ];
     PRODUCTS = [
       {
         id: "architectural-blazer",
@@ -706,7 +816,9 @@ async function createShopOrder(input) {
       deliveryAddress: addressLine(input.shippingAddress),
       shipping: input.shippingAddress,
       items: input.items.map((item) => ({
+        productId: item.productId,
         name: item.name,
+        image: item.image || "",
         quantity: item.quantity,
         price: item.price
       })),
@@ -1296,13 +1408,17 @@ function isApproved(doc) {
   return !doc.status || doc.status === "approved";
 }
 function orderHasProduct(order, productId) {
-  if ((order.products || []).some((item) => item.productId === productId)) return true;
-  if ((order.items || []).some((item) => item.productId === productId)) return true;
-  const catalog = PRODUCTS.find((item) => item.id === productId);
-  if (!catalog) return false;
-  const name = catalog.name.trim().toLowerCase();
-  if ((order.products || []).some((item) => (item.name || "").trim().toLowerCase() === name)) return true;
-  return (order.items || []).some((item) => (item.name || "").trim().toLowerCase() === name);
+  const id = productId.trim();
+  if (!id) return false;
+  if ((order.products || []).some((item) => (item.productId || "").trim() === id)) return true;
+  if ((order.items || []).some((item) => (item.productId || "").trim() === id)) return true;
+  const catalog = PRODUCTS.find((item) => item.id === id);
+  const name = (catalog?.name || "").trim().toLowerCase();
+  if (name) {
+    if ((order.products || []).some((item) => (item.name || "").trim().toLowerCase() === name)) return true;
+    if ((order.items || []).some((item) => (item.name || "").trim().toLowerCase() === name)) return true;
+  }
+  return false;
 }
 function isOrderConfirmed(order) {
   const status = `${order.orderStatus || ""} ${order.status || ""}`.toLowerCase();
@@ -1348,7 +1464,7 @@ async function savePurchaseRating(input) {
   }
   const order = await findStoredOrder(orderId);
   const catalog = PRODUCTS.find((item) => item.id === productId);
-  const productInOrder = order ? orderHasProduct(order, productId) : Boolean(catalog);
+  const productInOrder = order ? orderHasProduct(order, productId) : Boolean(productId && orderId);
   if (!productInOrder) {
     return { error: "This rating must match a confirmed order.", status: 403 };
   }
