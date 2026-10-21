@@ -1,19 +1,27 @@
-import React, { useMemo, useState } from 'react';
-import { Eye, Star, Trash2, Upload } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Crop, Eye, Star, Trash2, Upload } from 'lucide-react';
 import {
   AdminProduct,
   calculateSalePrice,
   discountPercentOff,
   getCatalogProduct,
   RETURN_POLICY_OPTIONS,
+  newDesignId,
   slugify,
   upsertProduct,
 } from '../catalog';
-import type { ReturnPolicy } from '../types';
+import type { ProductDesign, ReturnPolicy } from '../types';
 import { useAdminCategories } from '../hooks/useCatalog';
 import { formatINR } from '../lib/money';
 import { ImageLightbox } from '../components/ImageLightbox';
 import { AmazonSalePrice } from '../components/ProductPrice';
+import { ImageCropModal } from './ImageCropModal';
+import { saveProductRecord, storeProductImage, storeProductImages } from '../lib/productMedia';
+
+type CropSession =
+  | { mode: 'replace'; index: number; src: string }
+  | { mode: 'queue'; current: string; rest: string[] }
+  | { mode: 'design'; index: number; src: string };
 
 interface AdminProductFormProps {
   productId?: string | null;
@@ -23,6 +31,8 @@ interface AdminProductFormProps {
 }
 
 const HEX_PATTERN = /^#[0-9A-Fa-f]{6}$/;
+
+const CLOTHING_SIZE_PRESETS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Free Size'] as const;
 
 const COLOR_PRESETS: { name: string; hex: string }[] = [
   { name: 'Black', hex: '#000000' },
@@ -64,10 +74,13 @@ const emptyProduct = (): AdminProduct => ({
   images: [''],
   colors: [{ name: 'Black', hex: '#000000' }],
   sizes: [
+    { size: 'XS', available: true },
     { size: 'S', available: true },
     { size: 'M', available: true },
     { size: 'L', available: true },
     { size: 'XL', available: true },
+    { size: 'XXL', available: true },
+    { size: 'XXXL', available: true },
   ],
   description: '',
   detailsAndCare: [''],
@@ -84,6 +97,9 @@ const emptyProduct = (): AdminProduct => ({
   saleEnd: '',
   returnPolicy: 'return_and_replace',
   hasSizes: true,
+  hasColors: true,
+  purchasedFrom: '',
+  designs: [],
 });
 
 function readFiles(files: FileList): Promise<string[]> {
@@ -113,10 +129,44 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
 
   const salePrice = useMemo(() => calculateSalePrice(form), [form]);
 
+  // Recover photo URLs that were pasted into the design name field by mistake.
+  useEffect(() => {
+    setForm((prev) => {
+      let changed = false;
+      const designs = (prev.designs || []).map((design) => {
+        const name = design.name.trim();
+        if (!design.image.trim() && /^https?:\/\//i.test(name)) {
+          changed = true;
+          return { ...design, image: name, name: '' };
+        }
+        return design;
+      });
+      return changed ? { ...prev, designs } : prev;
+    });
+  }, []);
+
   const update = (patch: Partial<AdminProduct>) => setForm((prev) => ({ ...prev, ...patch }));
   const [openColorPicker, setOpenColorPicker] = useState<number | null>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [cropSession, setCropSession] = useState<CropSession | null>(null);
   const previewImages = form.images.filter(Boolean);
+
+  const appendCroppedImage = (dataUrl: string) => {
+    setForm((prev) => ({
+      ...prev,
+      images: [...prev.images.filter(Boolean), dataUrl],
+    }));
+  };
+
+  const finishCropQueue = (cropped: string, rest: string[]) => {
+    appendCroppedImage(cropped);
+    if (rest.length) {
+      setCropSession({ mode: 'queue', current: rest[0], rest: rest.slice(1) });
+      return;
+    }
+    setCropSession(null);
+    notify('Image crop saved.', 'success');
+  };
 
   const setColorAt = (index: number, hex: string, presetName?: string) => {
     setForm((prev) => {
@@ -138,11 +188,16 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
     update({
       category: slug,
       categoryLabel: cat?.name || slug,
-      breadcrumb: `Men / ${cat?.name || slug}`,
+      breadcrumb:
+        slug === 'jewellery'
+          ? 'Jewellery & Accessories'
+          : slug === 'kitchen'
+            ? 'Kitchen'
+            : `Men / ${cat?.name || slug}`,
     });
   };
 
-  const save = (e?: React.FormEvent | React.MouseEvent) => {
+  const save = async (e?: React.FormEvent | React.MouseEvent) => {
     e?.preventDefault();
     const nextErrors: string[] = [];
     if (!form.name.trim()) nextErrors.push('Product name is required.');
@@ -154,8 +209,9 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
       ? mainImages
       : form.colors.find((c) => c.images?.some(Boolean))?.images?.filter(Boolean) || [];
     if (!images.length) nextErrors.push('Add at least one product image.');
+    const showColors = form.hasColors !== false;
     const colors = form.colors.filter((c) => c.name.trim());
-    if (!colors.length) nextErrors.push('Add at least one color option.');
+    if (showColors && !colors.length) nextErrors.push('Add at least one color option.');
     const showSizes = form.hasSizes !== false;
     const sizes = form.sizes.filter((s) => s.size.trim());
     if (showSizes && !sizes.length) nextErrors.push('Add at least one size.');
@@ -171,6 +227,24 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
     if (form.saleStart && form.saleEnd && form.saleEnd < form.saleStart) {
       nextErrors.push('Sale end date must be after the start date.');
     }
+    const usedDesignIds = new Set<string>();
+    const designs: ProductDesign[] = (form.designs || [])
+      .map((design) => {
+        const name = design.name.trim();
+        const image = design.image.trim();
+        const color = design.color?.trim() || '';
+        let id = design.id.trim();
+        if (!id || usedDesignIds.has(id)) id = newDesignId([...usedDesignIds]);
+        usedDesignIds.add(id);
+        return { id, name, image, color };
+      })
+      .filter((design) => design.name || design.image);
+    if (designs.some((design) => !design.name || !design.image)) {
+      nextErrors.push('Each design needs a name and a photo.');
+    }
+    if (new Set(designs.map((design) => design.name.toLowerCase())).size !== designs.length) {
+      nextErrors.push('Each design name must be unique.');
+    }
     if (nextErrors.length) {
       setErrors(nextErrors);
       notify(nextErrors[0], 'error');
@@ -182,21 +256,30 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
       ...form,
       id,
       images,
-      colors: colors.map((c) => ({
-        name: c.name.trim(),
-        hex: c.hex || '#000000',
-        border: c.border,
-        images: c.images?.filter(Boolean).length ? c.images.filter(Boolean) : undefined,
-      })),
+      colors: colors.length
+        ? colors.map((c) => ({
+            name: c.name.trim(),
+            hex: c.hex || '#000000',
+            border: c.border,
+            images: c.images?.filter(Boolean).length ? c.images.filter(Boolean) : undefined,
+          }))
+        : form.colors,
       sizes: sizes.length ? sizes.map((s) => ({ ...s, size: s.size.trim() })) : form.sizes,
       hasSizes: showSizes,
+      hasColors: showColors,
+      designs,
+      purchasedFrom: form.purchasedFrom?.trim() || '',
       detailsAndCare: form.detailsAndCare.filter(Boolean),
       discountEnabled: form.saleEnabled ? true : form.discountEnabled,
       price: form.saleEnabled && form.discountValue ? salePrice : form.listPrice,
       isSale: Boolean(form.saleEnabled && form.discountValue),
     };
+    let stored = payload;
     try {
-      upsertProduct(payload);
+      stored = await storeProductImages(payload);
+      setForm(stored);
+      upsertProduct(stored);
+      await saveProductRecord(stored);
     } catch (err) {
       notify(err instanceof Error ? err.message : 'Could not save product.', 'error');
       return;
@@ -232,6 +315,16 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
           <input value={form.material || ''} onChange={(e) => update({ material: e.target.value })} className={fieldClass} />
         </label>
         <label className="block md:col-span-2">
+          <span className="text-sm">Purchased from (admin only)</span>
+          <input
+            value={form.purchasedFrom || ''}
+            onChange={(e) => update({ purchasedFrom: e.target.value })}
+            placeholder="e.g. Amazon, Flipkart, Alibaba…"
+            className={fieldClass}
+          />
+          <span className="mt-1 block text-xs text-slate-400">Only visible in admin — never shown to customers.</span>
+        </label>
+        <label className="block md:col-span-2">
           <span className="text-sm">Description</span>
           <textarea value={form.description} onChange={(e) => update({ description: e.target.value })} rows={4} className={fieldClass} />
         </label>
@@ -256,7 +349,8 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Product images</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Upload clear photos customers can zoom on the product page. The first image is the main storefront photo.
+              Main product photos only (listing + product page). These are separate from design photos below.
+              The first image is the storefront thumbnail. After upload you can crop each photo (default 3:4).
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -269,7 +363,7 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
             </button>
             <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm cursor-pointer hover:bg-slate-800">
               <Upload className="w-4 h-4" />
-              Upload images
+              Upload & crop
               <input
                 type="file"
                 accept="image/*"
@@ -280,10 +374,10 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
                   if (!input.files?.length) return;
                   try {
                     const urls = await readFiles(input.files);
-                    update({ images: [...form.images.filter(Boolean), ...urls] });
-                    notify(`${urls.length} image${urls.length === 1 ? '' : 's'} added.`, 'success');
-                  } catch {
-                    notify('Could not upload one or more images.', 'error');
+                    if (!urls.length) return;
+                    setCropSession({ mode: 'queue', current: urls[0], rest: urls.slice(1) });
+                  } catch (err) {
+                    notify(err instanceof Error ? err.message : 'Could not upload one or more images.', 'error');
                   } finally {
                     input.value = '';
                   }
@@ -333,6 +427,14 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
                     </button>
                     <button
                       type="button"
+                      onClick={() => setCropSession({ mode: 'replace', index, src })}
+                      className="flex-1 flex items-center justify-center bg-black/70 text-white py-1 cursor-pointer"
+                      title="Crop image"
+                    >
+                      <Crop className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setPreviewIndex(previewIdx)}
                       className="flex-1 flex items-center justify-center bg-black/70 text-white py-1 cursor-pointer"
                       title="Zoom preview"
@@ -368,6 +470,21 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
                   images[index] = e.target.value;
                   update({ images });
                 }}
+                onBlur={async (e) => {
+                  const value = e.target.value.trim();
+                  if (!value || value === url) return;
+                  try {
+                    const stored = await storeProductImage(value);
+                    setForm((prev) => {
+                      const images = [...prev.images];
+                      if (images[index]?.trim() !== value && images[index] !== stored) return prev;
+                      images[index] = stored;
+                      return { ...prev, images };
+                    });
+                  } catch (err) {
+                    notify(err instanceof Error ? err.message : 'Could not save the image.', 'error');
+                  }
+                }}
                 placeholder="https://… or upload above"
                 className={fieldClass + ' mt-0'}
               />
@@ -393,6 +510,231 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
             onClose={() => setPreviewIndex(null)}
           />
         )}
+
+        {cropSession && (
+          <ImageCropModal
+            imageSrc={cropSession.mode === 'queue' ? cropSession.current : cropSession.src}
+            title={
+              cropSession.mode === 'queue' && cropSession.rest.length
+                ? `Crop image (${cropSession.rest.length + 1} left)`
+                : 'Crop image'
+            }
+            onCancel={() => {
+              if (cropSession.mode === 'queue' && cropSession.rest.length) {
+                setCropSession({
+                  mode: 'queue',
+                  current: cropSession.rest[0],
+                  rest: cropSession.rest.slice(1),
+                });
+                return;
+              }
+              setCropSession(null);
+            }}
+            onCropped={async (dataUrl) => {
+              let stored = dataUrl;
+              try {
+                stored = await storeProductImage(dataUrl);
+              } catch (err) {
+                notify(err instanceof Error ? err.message : 'Could not save the cropped image.', 'error');
+                return;
+              }
+              if (cropSession.mode === 'design') {
+                const designIndex = cropSession.index;
+                setForm((prev) => {
+                  const designs = [...(prev.designs || [])];
+                  if (!designs[designIndex]) return prev;
+                  designs[designIndex] = { ...designs[designIndex], image: stored };
+                  return { ...prev, designs };
+                });
+                setCropSession(null);
+                notify('Design photo saved.', 'success');
+                return;
+              }
+              if (cropSession.mode === 'replace') {
+                const images = [...form.images];
+                images[cropSession.index] = stored;
+                update({ images });
+                setCropSession(null);
+                notify('Image saved.', 'success');
+                return;
+              }
+              finishCropQueue(stored, cropSession.rest);
+            }}
+          />
+        )}
+      </section>
+
+      <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Designs</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Same kurti, different looks — each design needs its own photo (not the product images above).
+              Every design gets a unique ID that is saved on the order when the customer picks it.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="px-4 py-2 rounded-xl border border-slate-200 text-sm"
+            onClick={() =>
+              update({
+                designs: [
+                  ...(form.designs || []),
+                  { id: newDesignId((form.designs || []).map((design) => design.id)), name: '', image: '', color: '' },
+                ],
+              })
+            }
+          >
+            Add design
+          </button>
+        </div>
+        {(form.designs || []).map((design, index) => (
+          <div key={design.id || index} className="grid md:grid-cols-[96px_1fr_auto] gap-3 items-start border border-slate-100 rounded-xl p-3">
+            <div className="relative w-24 h-28 bg-slate-100 rounded-lg overflow-hidden shrink-0">
+              {design.image.trim() ? (
+                <img
+                  key={design.image.trim()}
+                  src={design.image.trim()}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                    if (fallback) fallback.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <div
+                className={`w-full h-full flex items-center justify-center text-[10px] text-slate-400 px-2 text-center ${
+                  design.image.trim() ? 'hidden' : ''
+                }`}
+              >
+                {design.image.trim() ? 'Could not load photo' : 'No photo'}
+              </div>
+              {design.image.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => setCropSession({ mode: 'design', index, src: design.image.trim() })}
+                  className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/75 text-white text-[10px] py-1 cursor-pointer"
+                  title="Edit image"
+                >
+                  <Crop className="w-3 h-3" />
+                  Edit
+                </button>
+              ) : null}
+            </div>
+            <div className="space-y-2 min-w-0">
+              <p className="text-xs font-mono text-slate-500">ID {design.id || 'assigned on save'}</p>
+              <input
+                value={design.name}
+                placeholder="Design name, e.g. Black floral"
+                className={fieldClass}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const designs = [...(form.designs || [])];
+                  // If a photo URL is pasted into the name field, put it in the image field instead.
+                  if (/^https?:\/\//i.test(value.trim()) && !designs[index].image.trim()) {
+                    designs[index] = { ...designs[index], image: value.trim(), name: designs[index].name };
+                    update({ designs });
+                    return;
+                  }
+                  designs[index] = { ...designs[index], name: value };
+                  update({ designs });
+                }}
+              />
+              <label className="block">
+                <span className="text-xs text-slate-500">Color</span>
+                <input
+                  value={design.color || ''}
+                  placeholder="e.g. Pink"
+                  list={`design-color-${design.id || index}`}
+                  className={fieldClass}
+                  onChange={(e) => {
+                    const designs = [...(form.designs || [])];
+                    designs[index] = { ...designs[index], color: e.target.value };
+                    update({ designs });
+                  }}
+                />
+                <datalist id={`design-color-${design.id || index}`}>
+                  {form.colors
+                    .filter((color) => color.name.trim())
+                    .map((color) => (
+                      <option key={color.name} value={color.name} />
+                    ))}
+                </datalist>
+              </label>
+              <label className="block">
+                <span className="text-xs text-slate-500">Design photo URL</span>
+                <input
+                  value={design.image}
+                  placeholder="https://... or upload below"
+                  className={fieldClass}
+                  onChange={(e) => {
+                    const designs = [...(form.designs || [])];
+                    designs[index] = { ...designs[index], image: e.target.value };
+                    update({ designs });
+                  }}
+                  onBlur={async (e) => {
+                    const value = e.target.value.trim();
+                    if (!value || value === design.image.trim()) return;
+                    try {
+                      const stored = await storeProductImage(value);
+                      setForm((prev) => {
+                        const designs = [...(prev.designs || [])];
+                        const current = designs[index];
+                        if (!current || (current.image.trim() !== value && current.image !== stored)) return prev;
+                        designs[index] = { ...current, image: stored };
+                        return { ...prev, designs };
+                      });
+                    } catch (err) {
+                      notify(err instanceof Error ? err.message : 'Could not save the design photo.', 'error');
+                    }
+                  }}
+                />
+              </label>
+              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 text-sm cursor-pointer">
+                <Upload className="w-4 h-4" />
+                Upload design photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const input = e.currentTarget;
+                    const files = input.files;
+                    if (!files?.length) return;
+                    try {
+                      const [fileUrl] = await readFiles(files);
+                      const url = await storeProductImage(fileUrl);
+                      setForm((prev) => {
+                        const designs = [...(prev.designs || [])];
+                        if (!designs[index]) return prev;
+                        designs[index] = { ...designs[index], image: url };
+                        return { ...prev, designs };
+                      });
+                      notify('Design photo saved.', 'success');
+                    } catch (err) {
+                      notify(err instanceof Error ? err.message : 'Could not upload the design photo.', 'error');
+                    } finally {
+                      input.value = '';
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className="text-sm text-rose-700"
+              onClick={() => update({ designs: (form.designs || []).filter((_, i) => i !== index) })}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        {!(form.designs || []).length && (
+          <p className="text-xs text-slate-400">No extra designs. Customers will order this product as a single look.</p>
+        )}
       </section>
 
       <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
@@ -400,23 +742,38 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Colors</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Same product in more colors? Click Add color for each one and upload its photos — customers see those
-              photos when they pick that color.
+              {form.hasColors !== false
+                ? 'Same product in more colors? Click Add color for each one and upload its photos — customers see those photos when they pick that color.'
+                : 'Color options are hidden. Customers buy this product without choosing a color.'}
             </p>
           </div>
-          <button
-            type="button"
-            className="px-4 py-2 rounded-xl border border-slate-200 text-sm w-fit"
-            onClick={() =>
-              update({
-                colors: [...form.colors, { name: '', hex: '#888888' }],
-              })
-            }
-          >
-            Add color
-          </button>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.hasColors !== false}
+                onChange={(e) => update({ hasColors: e.target.checked })}
+              />
+              Show color options
+            </label>
+            {form.hasColors !== false && (
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-sm w-fit"
+                onClick={() =>
+                  update({
+                    colors: [...form.colors, { name: '', hex: '#888888' }],
+                  })
+                }
+              >
+                Add color
+              </button>
+            )}
+          </div>
         </div>
 
+        {form.hasColors !== false && (
+        <>
         <div className="rounded-xl bg-slate-50 px-4 py-3">
           <p className="text-xs uppercase tracking-[0.15em] font-semibold text-slate-700 mb-3">
             Color:{' '}
@@ -519,16 +876,18 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
                         if (!input.files?.length) return;
                         try {
                           const urls = await readFiles(input.files);
+                          const stored: string[] = [];
+                          for (const fileUrl of urls) stored.push(await storeProductImage(fileUrl));
                           setForm((prev) => {
                             const colors = [...prev.colors];
                             colors[index] = {
                               ...colors[index],
-                              images: [...(colors[index].images || []).filter(Boolean), ...urls],
+                              images: [...(colors[index].images || []).filter(Boolean), ...stored],
                             };
                             return { ...prev, colors };
                           });
-                        } catch {
-                          notify('Could not upload one or more images.', 'error');
+                        } catch (err) {
+                          notify(err instanceof Error ? err.message : 'Could not upload one or more images.', 'error');
                         } finally {
                           input.value = '';
                         }
@@ -607,6 +966,8 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
             </div>
           ))}
         </div>
+        </>
+        )}
       </section>
 
       <section className="bg-white border border-slate-200 rounded-2xl p-5 grid md:grid-cols-3 gap-4">
@@ -642,16 +1003,16 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
       </section>
 
       <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Sizes & price per size</h3>
             <p className="text-xs text-slate-400 mt-1">
               {form.hasSizes !== false
-                ? `Leave the price empty to use the original price (${formatINR(form.listPrice || 0, true)}). Sale discount applies to every size.`
+                ? `Set any sizes you sell (XS–XXXL, Free Size, or custom like 28 / 30). Leave price empty to use ${formatINR(form.listPrice || 0, true)}. Uncheck Available for out-of-stock sizes. Sale discount applies to every size.`
                 : 'Size options are hidden. Customers buy this product without choosing a size; availability follows the Stock field.'}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -666,11 +1027,36 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
                 className="px-4 py-2 rounded-xl border border-slate-200 text-sm w-fit"
                 onClick={() => update({ sizes: [...form.sizes, { size: '', available: true }] })}
               >
-                Add size
+                Add custom size
               </button>
             )}
           </div>
         </div>
+        {form.hasSizes !== false && (
+          <div className="flex flex-wrap gap-2">
+            {CLOTHING_SIZE_PRESETS.map((preset) => {
+              const exists = form.sizes.some((s) => s.size.trim().toUpperCase() === preset.toUpperCase());
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  disabled={exists}
+                  className={`px-3 py-1.5 rounded-full text-xs border ${
+                    exists
+                      ? 'border-slate-100 text-slate-300 cursor-not-allowed'
+                      : 'border-slate-200 text-slate-700 hover:border-slate-900 hover:bg-slate-50'
+                  }`}
+                  onClick={() => {
+                    if (exists) return;
+                    update({ sizes: [...form.sizes, { size: preset, available: true }] });
+                  }}
+                >
+                  + {preset}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {form.hasSizes !== false && form.sizes.map((s, index) => (
           <div
             key={index}
@@ -682,10 +1068,10 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
                 value={s.size}
                 onChange={(e) => {
                   const sizes = [...form.sizes];
-                  sizes[index] = { ...sizes[index], size: e.target.value.toUpperCase() };
+                  sizes[index] = { ...sizes[index], size: e.target.value };
                   update({ sizes });
                 }}
-                placeholder="M"
+                placeholder="M / XL / 28"
                 className={fieldClass}
               />
             </label>

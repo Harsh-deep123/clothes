@@ -120,7 +120,9 @@ export const ConfirmationPage: React.FC<ConfirmationPageProps> = ({
             {order.items.map((item) => (
               <div key={item.id} className="flex justify-between gap-4 text-[#5d5f5f]">
                 <span>
-                  {item.product.name} × {item.quantity}
+                  {item.product.name}
+                  {item.selectedDesignName ? ` · ${item.selectedDesignName}` : ''}
+                  {item.selectedDesignId ? ` (${item.selectedDesignId})` : ''} × {item.quantity}
                 </span>
                 <span className="text-black">{formatINR(item.price * item.quantity)}</span>
               </div>

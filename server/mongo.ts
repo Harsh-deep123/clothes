@@ -37,6 +37,7 @@ export async function getDb(): Promise<Db | null> {
       await database.collection('otp_challenges').createIndex({ email: 1, phone: 1 }, { unique: true });
       await database.collection('otp_challenges').createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 });
       await database.collection('products').createIndex({ id: 1 }, { unique: true });
+      await database.collection('product_images').createIndex({ id: 1 }, { unique: true });
       await database.collection('reviews').createIndex({ id: 1 }, { unique: true });
       await database.collection('reviews').createIndex({ productId: 1, createdAt: -1 });
       try {

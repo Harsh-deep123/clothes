@@ -5,6 +5,7 @@ import {
   Sofa,
   Car,
   Watch,
+  PenLine,
   HeartPulse,
   Home,
   Sparkles,
@@ -20,7 +21,6 @@ import {
 } from 'lucide-react';
 import { ViewScreen } from '../types';
 import {
-  HEALTH_BEAUTY_SUBCATEGORIES,
   WOMEN_SUBCATEGORIES,
   isHealthBeautyCategory,
   isWomenCategory,
@@ -28,7 +28,6 @@ import {
 
 const DRAWER_GROUPS: Record<string, { slug: string; name: string }[]> = {
   women: WOMEN_SUBCATEGORIES,
-  'health-beauty': HEALTH_BEAUTY_SUBCATEGORIES,
 };
 import { useI18n } from '../i18n/LanguageContext';
 import { MessageKey } from '../i18n/languages';
@@ -62,7 +61,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
 }) => {
   const { t } = useI18n();
   const [openGroup, setOpenGroup] = useState<string | null>(() =>
-    isWomenCategory(activeCategory) ? 'women' : isHealthBeautyCategory(activeCategory) ? 'health-beauty' : null,
+    isWomenCategory(activeCategory) ? 'women' : null,
   );
   if (!isOpen) return null;
 
@@ -83,10 +82,10 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
     },
     {
       key: 'nav.men' as MessageKey,
-      id: 'men',
+      id: 'jewellery',
       icon: User,
-      screen: 'new-arrivals' as ViewScreen,
-      category: 'all',
+      screen: 'category' as ViewScreen,
+      category: 'jewellery',
     },
     {
       key: 'nav.women' as MessageKey,
@@ -111,10 +110,10 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
     },
     {
       key: 'nav.jeans' as MessageKey,
-      id: 'jeans',
+      id: 'kitchen',
       icon: Layers,
       screen: 'category' as ViewScreen,
-      category: 'jeans',
+      category: 'kitchen',
     },
     {
       key: 'nav.bottomwear' as MessageKey,
@@ -143,6 +142,13 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
       icon: Watch,
       screen: 'category' as ViewScreen,
       category: 'accessories',
+    },
+    {
+      key: 'nav.stationeryOffice' as MessageKey,
+      id: 'stationery-office',
+      icon: PenLine,
+      screen: 'category' as ViewScreen,
+      category: 'stationery-office',
     },
     {
       key: 'nav.healthBeauty' as MessageKey,

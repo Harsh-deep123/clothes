@@ -57,49 +57,53 @@ export const WishlistPage: React.FC<WishlistPageProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
           {saved.map((product) => (
-            <article key={product.id} className="border border-[#cfc4c5]/30 bg-white p-4 sm:p-5">
+            <article key={product.id} className="flex flex-col">
               <button
                 type="button"
                 onClick={() => onSelectProduct(product)}
-                className="block w-full text-left cursor-pointer"
+                className="block w-full text-left cursor-pointer group"
               >
-                <div className="relative aspect-[3/4] overflow-hidden bg-[#eeeeee] mb-4 border border-[#cfc4c5]/20">
+                <div className="relative aspect-[3/4] overflow-hidden bg-[#eeeeee] mb-3 border border-[#cfc4c5]/20">
                   <img
                     src={product.images[0]}
                     alt={product.name}
-                    className="object-cover w-full h-full"
+                    className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>
-                <h2 className="font-serif-luxury text-xl text-black">{product.name}</h2>
+                <h2 className="font-serif-luxury text-sm md:text-base text-black leading-snug line-clamp-2">
+                  {product.name}
+                </h2>
                 <ProductRatingSummary productId={product.id} showEmpty className="mt-1" />
-                <p className="text-base font-medium text-black mt-1">
-                  <ProductPrice product={product} className="text-base font-medium text-black" />
+                <p className="text-sm font-medium text-black mt-1">
+                  <ProductPrice product={product} className="text-sm font-medium text-black" />
                 </p>
               </button>
-              <div className="flex gap-2 mt-3 mb-5">
-                {product.colors.map((color) => (
+              {product.hasColors !== false && (
+              <div className="flex gap-1.5 mt-2 mb-3">
+                {product.colors.slice(0, 5).map((color) => (
                   <span
                     key={color.name}
                     title={color.name}
-                    className="w-5 h-5 border border-[#cfc4c5]"
+                    className="w-3.5 h-3.5 border border-[#cfc4c5]"
                     style={{ backgroundColor: color.hex }}
                   />
                 ))}
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
+              )}
+              <div className="mt-auto flex flex-col gap-2">
                 <button
                   type="button"
                   onClick={() => onAddToBag(product)}
-                  className="flex-1 bg-black text-white text-xs font-semibold uppercase py-3.5 tracking-[0.2em] hover:bg-neutral-800 transition-colors cursor-pointer"
+                  className="w-full bg-black text-white text-[10px] md:text-xs font-semibold uppercase py-2.5 md:py-3 tracking-[0.15em] hover:bg-neutral-800 transition-colors cursor-pointer"
                 >
                   Add to Bag
                 </button>
                 <button
                   type="button"
                   onClick={() => onToggleWishlist(product.id)}
-                  className="flex-1 border border-black text-black text-xs font-semibold uppercase py-3.5 tracking-[0.2em] hover:bg-[#eeeeee] transition-colors cursor-pointer"
+                  className="w-full border border-black text-black text-[10px] md:text-xs font-semibold uppercase py-2.5 md:py-3 tracking-[0.15em] hover:bg-[#eeeeee] transition-colors cursor-pointer"
                 >
                   Remove
                 </button>

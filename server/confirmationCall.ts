@@ -71,7 +71,19 @@ function baseRecord(input: ConfirmationCallInput, existing?: StoredOrder | null)
     customerPhoneE164: e164,
     customerEmail: input.customerEmail || existing?.customerEmail || '',
     deliveryAddress: formatAddress(input.shippingAddress) || existing?.deliveryAddress || '',
-    items: input.items?.length ? input.items : existing?.items || [],
+    items: input.items?.length
+      ? input.items.map((item, index) => {
+          const previous = existing?.items?.[index];
+          return {
+            ...previous,
+            ...item,
+            image: previous?.image || '',
+            productId: previous?.productId,
+            designId: item.designId || previous?.designId || '',
+            designName: item.designName || previous?.designName || '',
+          };
+        })
+      : existing?.items || [],
     total: input.total,
     confirmationCallSent: existing?.confirmationCallSent || false,
     confirmationCallStatus: existing?.confirmationCallStatus || 'pending',

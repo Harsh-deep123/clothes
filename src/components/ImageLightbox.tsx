@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Minus, Plus, X, ZoomIn } from 'lucide-react';
 
 interface ImageLightboxProps {
@@ -216,6 +216,143 @@ export const HoverZoomImage: React.FC<HoverZoomImageProps> = ({ src, alt, scale 
         <ZoomIn className="w-3 h-3" />
         Zoom
       </span>
+    </div>
+  );
+};
+
+interface AmazonLensZoomProps {
+  images: string[];
+  alt: string;
+  activeIndex: number;
+  onSelect: (index: number) => void;
+}
+
+/** Amazon-style: thumbnails + main image lens + large zoom pane on the right. */
+export const AmazonLensZoom: React.FC<AmazonLensZoomProps> = ({
+  images,
+  alt,
+  activeIndex,
+  onSelect,
+}) => {
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [zooming, setZooming] = useState(false);
+  const [lens, setLens] = useState({ x: 0, y: 0, w: 0, h: 0, stageW: 0, stageH: 0 });
+  const src = images[Math.min(activeIndex, Math.max(images.length - 1, 0))] || images[0];
+  const LENS_RATIO = 0.42;
+
+  const moveLens = (clientX: number, clientY: number) => {
+    const el = stageRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const stageW = rect.width;
+    const stageH = rect.height;
+    if (!stageW || !stageH) return;
+    const w = stageW * LENS_RATIO;
+    const h = stageH * LENS_RATIO;
+    const mx = clientX - rect.left;
+    const my = clientY - rect.top;
+    const x = Math.min(Math.max(mx - w / 2, 0), stageW - w);
+    const y = Math.min(Math.max(my - h / 2, 0), stageH - h);
+    setLens({ x, y, w, h, stageW, stageH });
+    setZooming(true);
+  };
+
+  if (!src) return null;
+
+  const zoomScale = lens.w ? lens.stageW / lens.w : 2.4;
+
+  return (
+    <div className="relative w-full max-w-[440px] mx-auto md:mx-0">
+      <div className="flex gap-2 md:gap-3 items-start">
+        {images.length > 0 && (
+          <div className="hidden md:flex flex-col gap-2 shrink-0 max-h-[560px] overflow-y-auto pr-0.5">
+            {images.map((thumb, index) => (
+              <button
+                key={`${index}-${thumb.slice(-20)}`}
+                type="button"
+                onClick={() => onSelect(index)}
+                onMouseEnter={() => onSelect(index)}
+                aria-label={`Thumbnail ${index + 1}`}
+                aria-current={index === activeIndex}
+                className={`h-[72px] w-[54px] shrink-0 overflow-hidden border bg-[#eeeeee] cursor-pointer ${
+                  index === activeIndex ? 'border-black ring-1 ring-black' : 'border-[#cfc4c5]/50 hover:border-black'
+                }`}
+              >
+                <img src={thumb} alt="" className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="relative flex-1 min-w-0">
+          <div
+            ref={stageRef}
+            className="relative w-full aspect-[3/4] max-h-[560px] bg-[#eeeeee] overflow-hidden border border-[#cfc4c5]/20 cursor-crosshair"
+            onMouseEnter={(e) => moveLens(e.clientX, e.clientY)}
+            onMouseMove={(e) => moveLens(e.clientX, e.clientY)}
+            onMouseLeave={() => setZooming(false)}
+          >
+            <img src={src} alt={alt} draggable={false} className="h-full w-full object-contain object-center select-none" />
+            {zooming && (
+              <div
+                className="pointer-events-none absolute border border-[#2563eb]/80 bg-[#3b82f6]/25"
+                style={{
+                  left: lens.x,
+                  top: lens.y,
+                  width: lens.w,
+                  height: lens.h,
+                  backgroundImage:
+                    'linear-gradient(to right, rgba(37,99,235,0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(37,99,235,0.15) 1px, transparent 1px)',
+                  backgroundSize: '12px 12px',
+                }}
+              />
+            )}
+          </div>
+          <p className="mt-1.5 text-xs text-[#5d5f5f] hidden md:block">Hover image to zoom</p>
+
+          {images.length > 0 && (
+            <div className="mt-2 flex md:hidden flex-wrap gap-2">
+              {images.map((thumb, index) => (
+                <button
+                  key={`m-${index}-${thumb.slice(-20)}`}
+                  type="button"
+                  onClick={() => onSelect(index)}
+                  aria-label={`Thumbnail ${index + 1}`}
+                  className={`h-16 w-14 shrink-0 overflow-hidden border bg-[#eeeeee] cursor-pointer ${
+                    index === activeIndex ? 'border-black ring-1 ring-black' : 'border-[#cfc4c5]/50'
+                  }`}
+                >
+                  <img src={thumb} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {zooming && (
+        <div
+          className="pointer-events-none absolute left-full top-0 z-40 ml-3 hidden md:block overflow-hidden border border-[#cfc4c5]/40 bg-white shadow-2xl"
+          style={{
+            width: Math.max(lens.stageW, 320),
+            height: Math.max(lens.stageH, 320),
+          }}
+          aria-hidden
+        >
+          <img
+            src={src}
+            alt=""
+            draggable={false}
+            className="absolute max-w-none object-cover"
+            style={{
+              width: lens.stageW * zoomScale,
+              height: lens.stageH * zoomScale,
+              left: -lens.x * zoomScale,
+              top: -lens.y * zoomScale,
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };

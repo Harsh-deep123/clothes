@@ -204,6 +204,8 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
           image: str(row.image) || undefined,
           selectedSize: str(row.selectedSize) || undefined,
           selectedColor: str(row.selectedColor) || undefined,
+          designId: str(row.designId) || undefined,
+          designName: str(row.designName) || undefined,
           quantity: Number(row.quantity) || 1,
           price: Number(row.price) || 0,
         };
@@ -216,6 +218,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       paymentMethod: str(payload.paymentMethod) || 'cod',
       paymentStatus: str(payload.paymentStatus) || 'unpaid',
       stripePaymentIntentId: str(payload.stripePaymentIntentId) || undefined,
+      pendingPayment: payload.pendingPayment === true || str(payload.paymentStatus) === 'pending',
       deliveryLocation: normalizeDeliveryLocation(payload.deliveryLocation, deliveryAddressLine),
     });
     json(res, 201, { order });

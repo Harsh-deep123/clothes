@@ -105,18 +105,89 @@ export async function handleStripeApi(req: IncomingMessage, res: ServerResponse)
       const payload = JSON.parse((await readBody(req)) || '{}') as Record<string, unknown>;
       const amount = amountToPaise(Number(payload.amount) || 0);
       if (amount < 50) {
-        json(res, 400, { error: 'Order total is too small for card payment.' });
+        json(res, 400, { error: 'Order total is too small for online payment.' });
         return;
       }
-      const intent = await stripe.paymentIntents.create({
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      const itemSummary = items
+        .map((item) => {
+          const row = item as Record<string, unknown>;
+          const name = typeof row.name === 'string' ? row.name : 'Item';
+          const quantity = Number(row.quantity) || 1;
+          return `${name} x${quantity}`;
+        })
+        .join(', ')
+        .slice(0, 450);
+      const method = payload.method === 'upi' ? 'upi' : 'card';
+      const preferredApp = typeof payload.preferredApp === 'string' ? payload.preferredApp : '';
+      const email = typeof payload.email === 'string' ? payload.email : '';
+      const intentParams: Stripe.PaymentIntentCreateParams = {
         amount,
         currency: 'inr',
-        automatic_payment_methods: { enabled: true },
+        description: itemSummary ? `Zayro Store — ${itemSummary}` : 'Zayro Store order',
+        receipt_email: email || undefined,
         metadata: {
-          customerEmail: typeof payload.email === 'string' ? payload.email : '',
+          customerEmail: email,
+          preferredApp,
+          itemCount: String(items.length),
+          items: itemSummary,
+          totalRupees: (amount / 100).toFixed(2),
+          checkoutMethod: method,
         },
-      });
+      };
+      if (method === 'upi') {
+        intentParams.payment_method_types = ['upi'];
+      } else {
+        intentParams.automatic_payment_methods = { enabled: true };
+      }
+      const intent = await stripe.paymentIntents.create(intentParams);
       json(res, 200, { clientSecret: intent.client_secret, paymentIntentId: intent.id });
+      return;
+    }
+
+    if (url === '/api/stripe/verify-payment' && method === 'POST') {
+      const payload = JSON.parse((await readBody(req)) || '{}') as Record<string, unknown>;
+      const paymentIntentId = typeof payload.paymentIntentId === 'string' ? payload.paymentIntentId : '';
+      const expected = Number(payload.amount) || 0;
+      if (!paymentIntentId) {
+        json(res, 400, { error: 'Payment is missing.' });
+        return;
+      }
+      const stripe = stripeClient();
+      if (!stripe) {
+        json(res, 503, { error: 'Stripe is not configured.' });
+        return;
+      }
+      const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (intent.status !== 'succeeded') {
+        json(res, 200, { paid: false, status: intent.status, paymentIntentId });
+        return;
+      }
+      try {
+        await verifyPaidIntent(paymentIntentId, expected);
+        json(res, 200, { paid: true, status: intent.status, paymentIntentId });
+      } catch (error) {
+        json(res, 400, { paid: false, status: intent.status, error: publicStripeError(error) });
+      }
+      return;
+    }
+
+    if (url === '/api/stripe/webhook' && method === 'POST') {
+      const stripe = stripeClient();
+      const webhookSecret = cleanKey(process.env.STRIPE_WEBHOOK_SECRET || '');
+      if (!stripe || !webhookSecret) {
+        json(res, 503, { error: 'Stripe webhook is not configured. Add STRIPE_WEBHOOK_SECRET.' });
+        return;
+      }
+      const raw = await readBody(req);
+      const signature = String(req.headers['stripe-signature'] || '');
+      const event = stripe.webhooks.constructEvent(raw, signature, webhookSecret);
+      if (event.type === 'payment_intent.succeeded') {
+        const intent = event.data.object as Stripe.PaymentIntent;
+        const { confirmPaidOrderByIntent } = await import('./shopOrders');
+        await confirmPaidOrderByIntent(intent.id);
+      }
+      json(res, 200, { received: true });
       return;
     }
 

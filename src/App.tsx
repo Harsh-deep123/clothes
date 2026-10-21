@@ -32,13 +32,14 @@ import {
   setAuthToken,
   toLocalAccount,
 } from './lib/shopApi';
-import { getStorefrontProduct, getStorefrontProducts, imagesForColor, priceForSize } from './catalog';
+import { getStorefrontProduct, getStorefrontProducts, itemPreviewImage, priceForSize, productDesigns } from './catalog';
 import { useCatalogTick } from './hooks/useCatalog';
 import {
   AccountTab,
   CartItem,
   LocalAccount,
   PlacedOrder,
+  ProductDesign,
   Product,
   SavedAddress,
   ViewScreen,
@@ -299,13 +300,21 @@ export default function App() {
     pushAppUrl({ screen: 'product-detail', productId: product.id });
   };
 
-  const handleAddToCart = (product: Product, selectedColor: string, selectedSize: string) => {
+  const handleAddToCart = (
+    product: Product,
+    selectedColor: string,
+    selectedSize: string,
+    design?: ProductDesign,
+  ) => {
+    const selectedDesignId = design?.id || '';
+    const selectedDesignName = design?.name || '';
     setCartItems((prev) => {
       const existing = prev.find(
         (item) =>
           item.productId === product.id &&
           item.selectedColor === selectedColor &&
-          item.selectedSize === selectedSize
+          item.selectedSize === selectedSize &&
+          (item.selectedDesignId || '') === selectedDesignId
       );
       if (existing) {
         return prev.map((item) =>
@@ -318,12 +327,17 @@ export default function App() {
           product,
           selectedColor,
           selectedSize,
+          selectedDesignId: selectedDesignId || undefined,
+          selectedDesignName: selectedDesignName || undefined,
           quantity: 1,
           price: priceForSize(product, selectedSize).price,
         };
         return [...prev, newItem];
     });
-    showToast(`Added ${product.name} to Shopping Bag`, 'cart');
+    showToast(
+      selectedDesignName ? `Added ${product.name} (${selectedDesignName}) to Shopping Bag` : `Added ${product.name} to Shopping Bag`,
+      'cart',
+    );
   };
 
   const handleUpdateQuantity = (id: string, delta: number) => {
@@ -366,8 +380,13 @@ export default function App() {
   };
 
   const goAfterLogin = () => {
+    const stayForReview = Boolean(sessionStorage.getItem('zayro_open_review'));
     const dest = sessionStorage.getItem(AFTER_LOGIN_KEY);
     sessionStorage.removeItem(AFTER_LOGIN_KEY);
+    if (stayForReview) {
+      window.dispatchEvent(new Event('zayro:auth-changed'));
+      return;
+    }
     if (dest === '/checkout') handleNavigate('checkout');
     else if (dest === '/account/orders') handleNavigate('account', 'orders');
     else if (accountTab === 'orders') handleNavigate('account', 'orders');
@@ -481,9 +500,11 @@ export default function App() {
         items: cartItems.map((item) => ({
           productId: item.productId,
           name: item.product.name,
-          image: imagesForColor(item.product, item.selectedColor)[0],
+          image: itemPreviewImage(item),
           selectedSize: item.selectedSize,
           selectedColor: item.selectedColor,
+          designId: item.selectedDesignId || '',
+          designName: item.selectedDesignName || '',
           quantity: item.quantity,
           price: item.price,
         })),
@@ -493,10 +514,23 @@ export default function App() {
         discount: details.discount,
         total,
         paymentMethod: details.paymentMethod || 'cod',
-        paymentStatus: details.paymentStatus || (details.paymentMethod === 'stripe' ? 'paid' : 'unpaid'),
+        paymentStatus:
+          details.paymentStatus ||
+          (details.paymentMethod && details.paymentMethod !== 'cod' && details.paymentMethod !== 'gpay'
+            ? 'paid'
+            : 'unpaid'),
         stripePaymentIntentId: details.stripePaymentIntentId,
         deliveryLocation: details.deliveryLocation,
       });
+      if (
+        details.paymentMethod &&
+        details.paymentMethod !== 'cod' &&
+        details.paymentMethod !== 'gpay' &&
+        saved.paymentStatus &&
+        saved.paymentStatus !== 'paid'
+      ) {
+        throw new Error('Payment is still pending. The order is not confirmed yet.');
+      }
       orderId = saved.orderId || saved.number || saved.id;
       createdAt = saved.createdAt || createdAt;
       if (account?.id) {
@@ -510,8 +544,10 @@ export default function App() {
           postalCode: details.shippingAddress.postalCode,
         });
       }
-    } catch {
-      /* order still completes locally so checkout is not blocked */
+    } catch (error) {
+      if (details.paymentMethod && details.paymentMethod !== 'cod' && details.paymentMethod !== 'gpay') {
+        throw error;
+      }
     }
     const order: PlacedOrder = {
       ...details,
@@ -670,13 +706,17 @@ export default function App() {
           <ProductDetailScreen
             product={selectedProduct}
             onAddToCart={handleAddToCart}
-            onBuyNow={(p, c, s) => {
-              handleAddToCart(p, c, s);
+            onBuyNow={(p, c, s, design) => {
+              handleAddToCart(p, c, s, design);
               requestCheckout();
             }}
             onSelectProduct={handleSelectProduct}
             isWishlisted={wishlist.includes(selectedProduct.id)}
             onToggleWishlist={handleToggleWishlist}
+            onRequestSignIn={() => {
+              sessionStorage.setItem(AFTER_LOGIN_KEY, window.location.pathname);
+              setIsLoginModalOpen(true);
+            }}
             onOpenSizeGuide={() => setIsSizeGuideOpen(true)}
           />
         )}
@@ -708,6 +748,10 @@ export default function App() {
             products={storefrontProducts}
             onToggleWishlist={handleToggleWishlist}
             onAddToBag={(product) => {
+              if (productDesigns(product).length) {
+                handleSelectProduct(product);
+                return;
+              }
               const size = product.sizes.find((s) => s.available)?.size || product.sizes[0]?.size || 'M';
               handleAddToCart(product, product.colors[0]?.name || 'Standard', size);
             }}

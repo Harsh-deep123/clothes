@@ -67,7 +67,7 @@ export async function sendCustomerOrderEmail(order: StoredOrder): Promise<Partia
   const productRows = (order.items || [])
     .map(
       (item) =>
-        `<tr><td style="padding:8px;border:1px solid #ddd">${item.name}</td><td style="padding:8px;border:1px solid #ddd">${item.quantity}</td><td style="padding:8px;border:1px solid #ddd">${formatInr(item.price)}</td></tr>`
+        `<tr><td style="padding:8px;border:1px solid #ddd">${item.name}${item.designName ? ` — ${item.designName}${item.designId ? ` (${item.designId})` : ''}` : ''}</td><td style="padding:8px;border:1px solid #ddd">${item.quantity}</td><td style="padding:8px;border:1px solid #ddd">${formatInr(item.price)}</td></tr>`
     )
     .join('');
 

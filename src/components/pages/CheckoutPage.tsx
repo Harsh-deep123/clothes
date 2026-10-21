@@ -1,15 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CartItem, LocalAccount, PlacedOrder, SavedAddress, ViewScreen } from '../../types';
 import { CheckoutLocationMap } from '../checkout/CheckoutLocationMap';
 import { formatINR } from '../../lib/money';
-import { ONE_SIZE, imagesForColor, productHasColors } from '../../catalog';
+import { ONE_SIZE, itemPreviewImage } from '../../catalog';
 import { cartGrandTotal, getDeliveryQuote } from '../../lib/delivery';
 import type { IpinfoLite } from '../../lib/ipinfo';
 import type { SavedDeliveryLocation } from '../LocationWelcomeModal';
 import { CartBillDetails } from '../CartBillDetails';
 import { PaymentMethodModal, type CheckoutPaymentChoice } from '../PaymentMethodModal';
-import { fetchStripeConfig } from '../../lib/stripeCheckout';
+import { upiMethodLabel } from '../../lib/upi';
+import { fetchStripeConfig, verifyStripePayment } from '../../lib/stripeCheckout';
 import { loadStripeForKey } from '../../lib/stripeClient';
+import { apiCreateOrder } from '../../lib/shopApi';
+
+const PAY_RETURN_KEY = 'zayro_pending_payment';
 
 interface CheckoutPageProps {
   items: CartItem[];
@@ -82,6 +86,25 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     [form.city, form.state, form.country, form.countryCode, deliveryLocation, ipinfo]
   );
   const total = cartGrandTotal(subtotal, quote, discount);
+  const checkoutItems = useMemo(
+    () =>
+      items.map((item) => ({
+        productId: item.productId,
+        name: item.product.name,
+        image: itemPreviewImage(item),
+        selectedSize: item.selectedSize,
+        selectedColor: item.selectedColor,
+        designId: item.selectedDesignId || '',
+        designName: item.selectedDesignName || '',
+        quantity: item.quantity,
+        price: item.price,
+      })),
+    [items],
+  );
+  const stripeItems = useMemo(
+    () => checkoutItems.map((item) => ({ name: item.name, quantity: item.quantity, price: item.price })),
+    [checkoutItems],
+  );
 
   useEffect(() => {
     setForm(emptyCheckoutForm(account, savedAddresses));
@@ -98,6 +121,158 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const orderPayload = useCallback(
+    (choice: CheckoutPaymentChoice, intentId?: string, status: 'paid' | 'unpaid' | 'pending' = choice === 'cod' ? 'unpaid' : 'paid') => {
+      const shippingAddress = {
+        address: form.address.trim(),
+        city: form.city.trim(),
+        state: form.state.trim(),
+        postalCode: form.postalCode.trim(),
+        country: form.country.trim(),
+      };
+      const addressLine = [shippingAddress.address, shippingAddress.city, shippingAddress.state, shippingAddress.postalCode, shippingAddress.country]
+        .filter(Boolean)
+        .join(', ');
+      return {
+        customer: {
+          fullName: form.fullName.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+        },
+        shippingAddress,
+        shippingLabel: quote.zoneLabel || formatINR(quote.deliveryCharge, true),
+        discount,
+        estimatedDelivery: '3–6 business days after dispatch',
+        deliveryCharge: quote.deliveryCharge,
+        handlingCharge: quote.handlingCharge,
+        paymentMethod: choice,
+        paymentStatus: status,
+        stripePaymentIntentId: intentId,
+        deliveryLocation:
+          selectedCoords && Number.isFinite(selectedCoords.latitude) && Number.isFinite(selectedCoords.longitude)
+            ? {
+                latitude: selectedCoords.latitude,
+                longitude: selectedCoords.longitude,
+                address: addressLine,
+              }
+            : undefined,
+      };
+    },
+    [form, quote, discount, selectedCoords],
+  );
+
+  const startPendingOrder = useCallback(
+    async (intentId: string, choice: CheckoutPaymentChoice) => {
+      try {
+        sessionStorage.setItem(
+          PAY_RETURN_KEY,
+          JSON.stringify({ choice, intentId, form, selectedCoords, total }),
+        );
+      } catch {
+        /* ignore */
+      }
+      const payload = orderPayload(choice, intentId, 'pending');
+      await apiCreateOrder({
+        customerName: payload.customer.fullName,
+        customerEmail: payload.customer.email,
+        customerPhone: payload.customer.phone,
+        shippingAddress: payload.shippingAddress,
+        items: checkoutItems,
+        subtotal,
+        deliveryCharge: payload.deliveryCharge,
+        handlingCharge: payload.handlingCharge,
+        discount: payload.discount,
+        total,
+        paymentMethod: choice === 'cod' ? 'cod' : choice,
+        paymentStatus: 'pending',
+        pendingPayment: true,
+        stripePaymentIntentId: intentId,
+        deliveryLocation: payload.deliveryLocation,
+      });
+    },
+    [checkoutItems, form, orderPayload, selectedCoords, subtotal, total],
+  );
+
+  const handleIntentCreated = useCallback(
+    async (intentId: string, method: CheckoutPaymentChoice) => {
+      setStripePaymentIntentId(intentId);
+      setPaymentChoice(method);
+      await startPendingOrder(intentId, method);
+    },
+    [startPendingOrder],
+  );
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('pay_return') !== '1' && !params.get('payment_intent')) return;
+    const intentId = params.get('payment_intent') || '';
+    const clientSecret = params.get('payment_intent_client_secret') || '';
+    let cancelled = false;
+    void (async () => {
+      if (!items.length) return;
+      setPayOpen(true);
+      setPlacing(true);
+      setError(null);
+      try {
+        let storedChoice: CheckoutPaymentChoice = 'gpay';
+        try {
+          const raw = sessionStorage.getItem(PAY_RETURN_KEY);
+          const stored = raw
+            ? (JSON.parse(raw) as {
+                choice?: CheckoutPaymentChoice;
+                form?: typeof form;
+                selectedCoords?: typeof selectedCoords;
+              })
+            : null;
+          if (stored?.choice) storedChoice = stored.choice;
+          if (stored?.form) setForm(stored.form);
+          if (stored?.selectedCoords) setSelectedCoords(stored.selectedCoords);
+        } catch {
+          /* ignore */
+        }
+        const id = intentId || '';
+        if (!id) throw new Error('Payment details are missing. You can retry.');
+        if (clientSecret) {
+          const config = await fetchStripeConfig();
+          if (config.publishableKey) {
+            const stripeJs = await loadStripeForKey(config.publishableKey);
+            const retrieved = await stripeJs?.retrievePaymentIntent(clientSecret);
+            const status = retrieved?.paymentIntent?.status;
+            if (status && status !== 'succeeded' && status !== 'processing') {
+              throw new Error('Payment was cancelled or failed. You can retry.');
+            }
+          }
+        }
+        const verified = await verifyStripePayment(id, total);
+        if (!verified.paid) {
+          setPaymentChoice(storedChoice);
+          throw new Error('Payment is still pending. Finish it in your UPI app, then retry.');
+        }
+        if (cancelled) return;
+        setPaymentChoice(storedChoice);
+        const verifiedAgain = await verifyStripePayment(id, total);
+        if (!verifiedAgain.paid) throw new Error('Payment is still pending or failed. You can retry.');
+        await onPlaceOrder(orderPayload(storedChoice, id, 'paid'));
+        try {
+          sessionStorage.removeItem(PAY_RETURN_KEY);
+        } catch {
+          /* ignore */
+        }
+        window.history.replaceState({}, '', '/checkout');
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Payment was not completed.');
+        window.history.replaceState({}, '', '/checkout');
+      } finally {
+        if (!cancelled) setPlacing(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Return-from-UPI runs once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (items.length === 0) {
@@ -134,42 +309,21 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   };
 
   const placeOrder = async (choice: CheckoutPaymentChoice, intentId?: string) => {
+    if (choice !== 'cod' && choice !== 'gpay') {
+      if (!intentId) throw new Error('Payment is not complete.');
+      const verified = await verifyStripePayment(intentId, total);
+      if (!verified.paid) throw new Error('Payment is still pending or failed. You can retry.');
+    }
     setPlacing(true);
     try {
-      const shippingAddress = {
-        address: form.address.trim(),
-        city: form.city.trim(),
-        state: form.state.trim(),
-        postalCode: form.postalCode.trim(),
-        country: form.country.trim(),
-      };
-      const addressLine = [shippingAddress.address, shippingAddress.city, shippingAddress.state, shippingAddress.postalCode, shippingAddress.country]
-        .filter(Boolean)
-        .join(', ');
-      await onPlaceOrder({
-        customer: {
-          fullName: form.fullName.trim(),
-          email: form.email.trim(),
-          phone: form.phone.trim(),
-        },
-        shippingAddress,
-        shippingLabel: quote.zoneLabel || formatINR(quote.deliveryCharge, true),
-        discount,
-        estimatedDelivery: '3–6 business days after dispatch',
-        deliveryCharge: quote.deliveryCharge,
-        handlingCharge: quote.handlingCharge,
-        paymentMethod: choice,
-        paymentStatus: choice === 'stripe' ? 'paid' : 'unpaid',
-        stripePaymentIntentId: intentId,
-        deliveryLocation:
-          selectedCoords && Number.isFinite(selectedCoords.latitude) && Number.isFinite(selectedCoords.longitude)
-            ? {
-                latitude: selectedCoords.latitude,
-                longitude: selectedCoords.longitude,
-                address: addressLine,
-              }
-            : undefined,
-      });
+      await onPlaceOrder(
+        orderPayload(choice, intentId, choice === 'cod' || choice === 'gpay' ? 'unpaid' : 'paid'),
+      );
+      try {
+        sessionStorage.removeItem(PAY_RETURN_KEY);
+      } catch {
+        /* ignore */
+      }
     } finally {
       setPlacing(false);
     }
@@ -179,7 +333,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     e.preventDefault();
     if (!formReady()) return;
     if (paymentChoice !== 'cod') {
-      setError('Choose Cash on Delivery in the payment popup, then click Place Order.');
+      setError('Choose a payment option. Online orders are confirmed only after Stripe verifies payment.');
       return;
     }
     await placeOrder('cod');
@@ -317,13 +471,29 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     setPayOpen(true);
                   }}
                 />
-                <span>Open payment options to pay with Stripe or choose Cash on Delivery.</span>
+                <span>Open payment options: Google Pay, PhonePe, Paytm, card, or Cash on Delivery.</span>
               </label>
               {paymentChoice === 'cod' && (
                 <p className="text-sm text-[#5d5f5f]">Cash on Delivery selected. Click Place Order to confirm.</p>
               )}
+              {paymentChoice === 'gpay' && (
+                <p className="text-sm text-[#5d5f5f]">
+                  Google Pay selected. Pay 7681987334 with shopping payment filled, then return here to confirm the order.
+                </p>
+              )}
+              {(paymentChoice === 'phonepe' || paymentChoice === 'paytm') && (
+                <p className="text-sm text-[#5d5f5f]">
+                  {upiMethodLabel(paymentChoice)} selected. Complete payment in the popup. The order is confirmed only after Stripe verifies it.
+                </p>
+              )}
               {paymentChoice === 'stripe' && (
-                <p className="text-sm text-[#5d5f5f]">Card payment complete.</p>
+                <p className="text-sm text-[#5d5f5f]">Card payment verified.</p>
+              )}
+              {placing && paymentChoice !== 'cod' && paymentChoice !== 'gpay' && (
+                <p className="text-sm text-[#5d5f5f]">Payment pending. Waiting for Stripe to confirm…</p>
+              )}
+              {placing && paymentChoice === 'gpay' && (
+                <p className="text-sm text-[#5d5f5f]">Confirming your Google Pay order…</p>
               )}
             </div>
           </section>
@@ -348,19 +518,19 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
               {items.map((item) => (
                 <div key={item.id} className="flex gap-3 text-xs">
                   <img
-                    src={imagesForColor(item.product, item.selectedColor)[0]}
+                    src={itemPreviewImage(item)}
                     alt=""
                     className="w-12 h-16 object-cover bg-white border border-[#cfc4c5]/20"
                   />
                   <div className="flex-grow">
                     <p className="font-medium text-black">{item.product.name}</p>
-                    {(productHasColors(item.product) || item.selectedSize !== ONE_SIZE) && (
                     <p className="text-[#5d5f5f]">
-                      {productHasColors(item.product) && item.selectedColor}
-                      {productHasColors(item.product) && item.selectedSize !== ONE_SIZE && ' • '}
-                      {item.selectedSize !== ONE_SIZE && `Size ${item.selectedSize}`}
+                      {item.selectedDesignName
+                        ? `Design: ${item.selectedDesignName}${item.selectedDesignId ? ` · ${item.selectedDesignId}` : ''} • `
+                        : ''}
+                      {item.selectedColor}
+                      {item.selectedSize !== ONE_SIZE && ` • Size ${item.selectedSize}`}
                     </p>
-                    )}
                     <p className="text-[#5d5f5f]">Qty: {item.quantity}</p>
                   </div>
                   <p className="font-semibold">{formatINR(item.price * item.quantity)}</p>
@@ -376,16 +546,27 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
       <PaymentMethodModal
         isOpen={payOpen}
         amount={total}
+        subtotal={subtotal}
+        deliveryCharge={quote.deliveryCharge}
+        handlingCharge={quote.handlingCharge}
+        discount={discount}
         email={form.email}
+        items={stripeItems}
         onClose={() => setPayOpen(false)}
-        onStripePaid={async (intentId) => {
+        onIntentCreated={handleIntentCreated}
+        onStripePaid={async (intentId, method) => {
           setStripePaymentIntentId(intentId);
-          setPaymentChoice('stripe');
+          setPaymentChoice(method);
+          await placeOrder(method, intentId);
           setPayOpen(false);
-          await placeOrder('stripe', intentId);
         }}
         onChooseCod={() => {
           setPaymentChoice('cod');
+          setPayOpen(false);
+        }}
+        onGpayPaid={async () => {
+          setPaymentChoice('gpay');
+          await placeOrder('gpay');
           setPayOpen(false);
         }}
       />

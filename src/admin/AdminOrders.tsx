@@ -16,7 +16,14 @@ type AdminOrderCall = {
   customerPhoneE164: string;
   customerEmail?: string;
   deliveryAddress?: string;
-  items?: Array<{ name: string; quantity: number; price: number }>;
+  items?: Array<{
+    name: string;
+    quantity: number;
+    price: number;
+    image?: string;
+    designId?: string;
+    designName?: string;
+  }>;
   total: number;
   paymentMethod?: string;
   paymentStatus?: string;
@@ -247,10 +254,27 @@ export const AdminOrders: React.FC<{ notify?: (message: string, type: 'success' 
             </div>
             <div className="md:col-span-2">
               <dt className="text-slate-400">Products</dt>
-              <dd className="whitespace-pre-wrap">
-                {(order.items || [])
-                  .map((item) => `${item.name} × ${item.quantity} · ₹${Number(item.price).toLocaleString('en-IN')}`)
-                  .join('\n') || '—'}
+              <dd className="space-y-3">
+                {(order.items || []).length
+                  ? (order.items || []).map((item, index) => (
+                      <div key={`${item.designId || item.name}-${index}`} className="flex gap-3">
+                        {item.image ? (
+                          <img src={item.image} alt="" className="w-12 h-16 object-cover rounded-lg bg-slate-100" />
+                        ) : null}
+                        <div>
+                          <p>
+                            {item.name} × {item.quantity} · ₹{Number(item.price).toLocaleString('en-IN')}
+                          </p>
+                          {(item.designName || item.designId) && (
+                            <p className="text-xs text-slate-600 mt-0.5">
+                              Design: {item.designName || 'Selected design'}
+                              {item.designId ? ` · ID ${item.designId}` : ''}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  : '—'}
               </dd>
             </div>
             <div>

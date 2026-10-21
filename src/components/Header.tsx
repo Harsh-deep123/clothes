@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { Menu, Search, ShoppingBag, User, MapPin, ChevronDown } from 'lucide-react';
 import { ViewScreen } from '../types';
 import {
-  HEALTH_BEAUTY_SUBCATEGORIES,
   WOMEN_SUBCATEGORIES,
   isHealthBeautyCategory,
   isWomenCategory,
@@ -40,24 +39,24 @@ export const Header: React.FC<HeaderProps> = ({
   const [scrolled, setScrolled] = useState(false);
   const [openMenu, setOpenMenu] = useState<'women' | 'more' | null>(null);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
-  const [healthOpen, setHealthOpen] = useState(false);
   const navItems = [
     { key: 'nav.home' as MessageKey, id: 'home', screen: 'home' as ViewScreen, category: undefined },
     { key: 'nav.newArrivals' as MessageKey, id: 'new-arrivals', screen: 'new-arrivals' as ViewScreen, category: undefined },
-    { key: 'nav.men' as MessageKey, id: 'men', screen: 'new-arrivals' as ViewScreen, category: 'all' },
+    { key: 'nav.men' as MessageKey, id: 'jewellery', screen: 'category' as ViewScreen, category: 'jewellery' },
     { key: 'nav.women' as MessageKey, id: 'women', screen: 'category' as ViewScreen, category: 'women' },
     { key: 'nav.tshirts' as MessageKey, id: 't-shirts', screen: 'category' as ViewScreen, category: 't-shirts' },
     { key: 'nav.shirts' as MessageKey, id: 'shirts', screen: 'category' as ViewScreen, category: 'shirts' },
-    { key: 'nav.jeans' as MessageKey, id: 'jeans', screen: 'category' as ViewScreen, category: 'jeans' },
+    { key: 'nav.jeans' as MessageKey, id: 'kitchen', screen: 'category' as ViewScreen, category: 'kitchen' },
     { key: 'nav.bottomwear' as MessageKey, id: 'bottomwear', screen: 'category' as ViewScreen, category: 'bottomwear' },
     { key: 'nav.homeDecor' as MessageKey, id: 'home-decor', screen: 'category' as ViewScreen, category: 'home-decor' },
     { key: 'nav.autoParts' as MessageKey, id: 'auto-electrical', screen: 'category' as ViewScreen, category: 'auto-electrical' },
     { key: 'nav.accessories' as MessageKey, id: 'accessories', screen: 'category' as ViewScreen, category: 'accessories' },
+    { key: 'nav.stationeryOffice' as MessageKey, id: 'stationery-office', screen: 'category' as ViewScreen, category: 'stationery-office' },
     { key: 'nav.healthBeauty' as MessageKey, id: 'health-beauty', screen: 'category' as ViewScreen, category: 'health-beauty' },
     { key: 'nav.sale' as MessageKey, id: 'sale', screen: 'new-arrivals' as ViewScreen, category: 'sale', isSale: true },
   ];
 
-  const visibleNavCount = navItems.findIndex((item) => item.id === 'jeans') + 1;
+  const visibleNavCount = navItems.findIndex((item) => item.id === 'kitchen') + 1;
   const primaryNavItems = navItems.slice(0, visibleNavCount);
   const moreNavItems = navItems.slice(visibleNavCount);
 
@@ -68,7 +67,6 @@ export const Header: React.FC<HeaderProps> = ({
     }
     const rect = trigger.getBoundingClientRect();
     setMenuPos({ left: rect.left + rect.width / 2, top: rect.bottom + 12 });
-    setHealthOpen(false);
     setOpenMenu(menu);
   };
 
@@ -299,44 +297,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
             {openMenu === 'more' &&
               renderMenuPanel(
-                moreNavItems.map((item) =>
-                  item.id === 'health-beauty' ? (
-                    <div key={item.id} className="border-b last:border-b-0 border-[#cfc4c5]/40">
-                      <button
-                        type="button"
-                        id={`nav-${item.id}`}
-                        aria-expanded={healthOpen}
-                        onClick={() => setHealthOpen((open) => !open)}
-                        className={`flex w-full items-center justify-between text-left px-6 py-3.5 text-sm hover:bg-[#eeeeee] cursor-pointer ${
-                          isItemActive(item) ? 'text-black font-semibold' : 'text-[#5d5f5f]'
-                        }`}
-                      >
-                        {t(item.key)}
-                        <ChevronDown
-                          className={`w-3.5 h-3.5 stroke-[1.8] transition-transform ${healthOpen ? 'rotate-180' : ''}`}
-                        />
-                      </button>
-                      {healthOpen && (
-                      <div className="pb-2">
-                      {[{ slug: 'health-beauty', name: 'View All' }, ...HEALTH_BEAUTY_SUBCATEGORIES].map((sub) => (
-                        <button
-                          key={sub.slug}
-                          type="button"
-                          onClick={() => {
-                            setOpenMenu(null);
-                            onNavigate('category', sub.slug);
-                          }}
-                          className={`block w-full text-left pl-10 pr-6 py-1.5 text-sm hover:bg-[#eeeeee] cursor-pointer ${
-                            activeCategory === sub.slug && onShopScreen ? 'text-black font-semibold' : 'text-[#5d5f5f]'
-                          }`}
-                        >
-                          {sub.name}
-                        </button>
-                      ))}
-                      </div>
-                      )}
-                    </div>
-                  ) : (
+                moreNavItems.map((item) => (
                   <button
                     key={item.id}
                     type="button"
@@ -355,8 +316,7 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     {t(item.key)}
                   </button>
-                  ),
-                ),
+                )),
               )}
           </div>
         )}

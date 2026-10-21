@@ -52,6 +52,8 @@ export type DeliverySlipOrder = {
     price?: number;
     selectedSize?: string;
     selectedColor?: string;
+    designId?: string;
+    designName?: string;
   }>;
   total: number;
   paymentMethod?: string;
@@ -123,9 +125,9 @@ type SlipLine = { name: string; sku: string; qty: number; unit: number };
 function slipLines(order: DeliverySlipOrder): SlipLine[] {
   if (order.products?.length) {
     return order.products.map((product) => {
-      const skuParts = [product.productId, product.selectedSize, product.selectedColor].filter(Boolean);
+      const skuParts = [product.productId, product.designId, product.selectedSize, product.selectedColor].filter(Boolean);
       return {
-        name: product.name || 'Item',
+        name: [product.name || 'Item', product.designName].filter(Boolean).join(' — '),
         sku: skuParts.join('-').toUpperCase(),
         qty: Number(product.quantity) || 1,
         unit: Number(product.price) || 0,

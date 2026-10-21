@@ -56,6 +56,8 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     { label: 'Cargos', value: 'cargos' },
     { label: 'Footwear', value: 'shoes' },
     { label: 'Accessories', value: 'accessories' },
+    { label: 'Jewellery & Accessories', value: 'jewellery' },
+    { label: 'Kitchen', value: 'kitchen' },
     { label: "Women's Clothing", value: 'women' },
     ...WOMEN_SUBCATEGORIES.map((sub) => ({ label: sub.name, value: sub.slug })),
     ...STORE_SECTION_CATEGORIES.filter((section) => section.slug !== 'accessories').map((section) => ({
@@ -67,7 +69,7 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     ...adminCategories
       .filter(
         (c) =>
-          !['jackets', 't-shirts', 'shirts', 'jeans', 'bottomwear', 'cargos', 'shoes', 'accessories'].includes(c.slug) &&
+          !['jackets', 't-shirts', 'shirts', 'jeans', 'bottomwear', 'cargos', 'shoes', 'accessories', 'jewellery', 'kitchen'].includes(c.slug) &&
           !isAddedStoreCategory(c.slug),
       )
       .map((c) => ({ label: c.name, value: c.slug })),
@@ -92,7 +94,11 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     let list = [...products];
 
     // Category filter
-    if (selectedCategory && selectedCategory !== 'all') {
+    if (categoryFilter === 'jewellery') {
+      list = list.filter((p) => p.category === 'jewellery');
+    } else if (categoryFilter === 'kitchen') {
+      list = list.filter((p) => p.category === 'kitchen');
+    } else if (selectedCategory && selectedCategory !== 'all') {
       if (selectedCategory === 'sale') {
         list = list.filter((p) => p.isSale || p.price <= 12499);
       } else if (selectedCategory === 'women') {
@@ -138,7 +144,7 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     }
 
     return list;
-  }, [products, selectedCategory, selectedSize, selectedColor, selectedPriceRange, sortBy]);
+  }, [products, selectedCategory, selectedSize, selectedColor, selectedPriceRange, sortBy, categoryFilter]);
 
   const activeFilterCount =
     (selectedCategory !== 'all' ? 1 : 0) +
@@ -147,7 +153,9 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     (selectedPriceRange !== 'all' ? 1 : 0);
 
   const resetFilters = () => {
-    setSelectedCategory('all');
+    setSelectedCategory(
+      categoryFilter === 'jewellery' ? 'jewellery' : categoryFilter === 'kitchen' ? 'kitchen' : 'all',
+    );
     setSelectedSize('all');
     setSelectedColor('all');
     setSelectedPriceRange('all');
@@ -172,9 +180,13 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
             : categories.find((c) => c.value === selectedCategory)?.label || 'Collection'}
         </h1>
         <p className="text-base sm:text-lg text-[#5d5f5f] mt-3 md:mt-4 max-w-2xl font-light">
-          {isMenPage && selectedCategory === 'all'
-            ? 'Explore the complete ZAYRO menswear collection — tailoring, shirts, denim, and everyday essentials.'
-            : 'Discover the latest additions to our collection. Minimalist design meets premium craftsmanship.'}
+          {categoryFilter === 'jewellery'
+            ? 'Rings, necklaces, earrings and other jewellery.'
+            : categoryFilter === 'kitchen'
+              ? 'Cookware, utensils and kitchen essentials.'
+            : isMenPage && selectedCategory === 'all'
+              ? 'Explore the complete ZAYRO menswear collection — tailoring, shirts, denim, and everyday essentials.'
+              : 'Discover the latest additions to our collection. Minimalist design meets premium craftsmanship.'}
         </p>
       </div>
 

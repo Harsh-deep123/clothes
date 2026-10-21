@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, CheckCircle, ShieldCheck, ArrowRight, CreditCard, Lock } from 'lucide-react';
 import { CartItem } from '../types';
 import { formatINR } from '../lib/money';
-import { ONE_SIZE, imagesForColor, productHasColors } from '../catalog';
+import { ONE_SIZE, itemPreviewImage } from '../catalog';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -210,19 +210,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     {items.map((item) => (
                       <div key={item.id} className="flex gap-3 text-xs">
                         <img
-                          src={imagesForColor(item.product, item.selectedColor)[0]}
+                          src={itemPreviewImage(item)}
                           alt={item.product.name}
                           className="w-12 h-16 object-cover bg-white border border-[#cfc4c5]/20"
                         />
                         <div className="flex-grow">
                           <p className="font-medium text-black">{item.product.name}</p>
-                          {(productHasColors(item.product) || item.selectedSize !== ONE_SIZE) && (
                           <p className="text-[#5d5f5f]">
-                            {productHasColors(item.product) && item.selectedColor}
-                            {productHasColors(item.product) && item.selectedSize !== ONE_SIZE && ' • '}
-                            {item.selectedSize !== ONE_SIZE && `Size: ${item.selectedSize}`}
+                            {item.selectedDesignName
+                              ? `${item.selectedDesignName}${item.selectedDesignId ? ` · ${item.selectedDesignId}` : ''} • `
+                              : ''}
+                            {item.selectedColor}
+                            {item.selectedSize !== ONE_SIZE && ` • Size: ${item.selectedSize}`}
                           </p>
-                          )}
                           <p className="text-[#5d5f5f]">Qty: {item.quantity}</p>
                         </div>
                         <p className="font-semibold text-black">{formatINR(item.price * item.quantity)}</p>

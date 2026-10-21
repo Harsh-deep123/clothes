@@ -1,5 +1,5 @@
 import { CATEGORIES, PRODUCTS, isAddedStoreCategory } from './data/products';
-import { CategoryInfo, Product, ReturnPolicy } from './types';
+import { CategoryInfo, Product, ProductDesign, ReturnPolicy } from './types';
 
 export const LOW_STOCK_THRESHOLD = 5;
 export const CATALOG_KEY = 'zayro_admin_catalog_inr_v1';
@@ -17,6 +17,8 @@ export interface AdminProduct extends Product {
   saleEnabled: boolean;
   saleStart: string;
   saleEnd: string;
+  /** Admin-only note: website where this product was purchased. Never shown on storefront. */
+  purchasedFrom?: string;
 }
 
 type Listener = () => void;
@@ -92,7 +94,26 @@ function catalogForStorage(items: AdminProduct[], stripDataUrls = false): AdminP
     colors: item.colors.map((color) =>
       color.images?.length ? { ...color, images: imagesForStorage(color.images, stripDataUrls) } : color,
     ),
+    designs: (item.designs || [])
+      .map((design) => ({
+        ...design,
+        image: imagesForStorage([design.image], stripDataUrls)[0] || '',
+      }))
+      .filter((design) => design.id && design.name && design.image),
   }));
+}
+
+export function newDesignId(existing: string[] = []) {
+  const taken = new Set(existing);
+  let id = '';
+  do {
+    id = `DSN-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  } while (taken.has(id));
+  return id;
+}
+
+export function productDesigns(product: Pick<Product, 'designs'>): ProductDesign[] {
+  return (product.designs || []).filter((design) => design.id && design.name.trim() && design.image);
 }
 
 function writeLocalStorage(key: string, value: string) {
@@ -183,8 +204,22 @@ export function imagesForColor(product: Pick<Product, 'images' | 'colors'>, colo
   return colorImages?.length ? colorImages : product.images;
 }
 
+export function itemPreviewImage(item: {
+  product: Pick<Product, 'images' | 'colors' | 'designs'>;
+  selectedColor?: string;
+  selectedDesignId?: string;
+}): string {
+  const design = productDesigns(item.product).find((entry) => entry.id === item.selectedDesignId);
+  if (design?.image) return design.image;
+  return imagesForColor(item.product, item.selectedColor)[0] || '';
+}
+
 export function productHasSizes(product: Pick<Product, 'hasSizes'>): boolean {
   return product.hasSizes !== false;
+}
+
+export function productHasColors(product: Pick<Product, 'hasColors'>): boolean {
+  return product.hasColors !== false;
 }
 
 export function toStorefrontProduct(product: AdminProduct): Product {
@@ -192,8 +227,9 @@ export function toStorefrontProduct(product: AdminProduct): Product {
   const listPrice = product.listPrice || product.price;
   const price = live ? calculateSalePrice(product) : listPrice;
   const outOfStock = product.stock <= 0;
+  const { purchasedFrom: _adminOnly, ...storefront } = product;
   return {
-    ...product,
+    ...storefront,
     price,
     originalPrice: live ? listPrice : undefined,
     isSale: live,

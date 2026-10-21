@@ -16,12 +16,14 @@ interface ProductReviewsSectionProps {
   productId: string;
   productName: string;
   productImage?: string;
+  onRequestSignIn?: () => void;
 }
 
 export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
   productId,
   productName,
   productImage,
+  onRequestSignIn,
 }) => {
   const [page, setPage] = useState(1);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
@@ -54,9 +56,25 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
     void load(1, false);
   }, [productId]);
 
+  useEffect(() => {
+    const tryOpenPendingReview = () => {
+      try {
+        const pending = sessionStorage.getItem('zayro_open_review');
+        if (pending && pending === productId && getAuthToken()) {
+          sessionStorage.removeItem('zayro_open_review');
+          setWriteOpen(true);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    tryOpenPendingReview();
+    window.addEventListener('zayro:auth-changed', tryOpenPendingReview);
+    return () => window.removeEventListener('zayro:auth-changed', tryOpenPendingReview);
+  }, [productId]);
+
   const breakdown = summary?.breakdown || emptyBreakdown;
   const totalReviews = summary?.totalReviews || 0;
-  const loggedIn = Boolean(getAuthToken());
 
   return (
     <section id="customer-reviews" className="mt-24 md:mt-32 pt-16 border-t border-[#cfc4c5]/30">
@@ -65,7 +83,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
         <button
           type="button"
           onClick={() => setWriteOpen(true)}
-          className="text-xs font-semibold uppercase tracking-[0.2em] bg-black text-white px-8 py-4 hover:bg-neutral-800 cursor-pointer"
+          className="shrink-0 text-xs font-semibold uppercase tracking-[0.2em] bg-black text-white px-8 py-4 hover:bg-neutral-800 cursor-pointer"
         >
           Write a Review
         </button>
@@ -199,7 +217,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
         <WriteReviewModal
           productId={productId}
           productName={productName}
-          isLoggedIn={loggedIn}
+          onRequestSignIn={onRequestSignIn}
           onClose={() => setWriteOpen(false)}
           onSubmitted={(message) => {
             setWriteOpen(false);

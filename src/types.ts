@@ -41,6 +41,16 @@ export interface Product {
   hasSizes?: boolean;
   /** When false, customers don't pick a color. */
   hasColors?: boolean;
+  /** Alternate looks of the same product. The chosen design is stored on the order. */
+  designs?: ProductDesign[];
+}
+
+export interface ProductDesign {
+  id: string;
+  name: string;
+  image: string;
+  /** Color the customer selects and purchases with this design. */
+  color?: string;
 }
 
 export type ReturnPolicy = 'return_and_replace' | 'replace_only' | 'return_only' | 'none';
@@ -51,6 +61,9 @@ export interface CartItem {
   product: Product;
   selectedColor: string;
   selectedSize: string;
+  /** Set when the customer picks one design of this product. */
+  selectedDesignId?: string;
+  selectedDesignName?: string;
   quantity: number;
   price: number;
 }
@@ -129,8 +142,8 @@ export interface PlacedOrder {
   estimatedDelivery: string;
   deliveryCharge?: number;
   handlingCharge?: number;
-  paymentMethod?: 'stripe' | 'cod';
-  paymentStatus?: 'paid' | 'unpaid';
+  paymentMethod?: 'stripe' | 'cod' | 'gpay' | 'phonepe' | 'paytm';
+  paymentStatus?: 'paid' | 'unpaid' | 'pending';
   stripePaymentIntentId?: string;
   status?: string;
   trackingId?: string;

@@ -2,7 +2,15 @@ export type OrderLineItem = {
   name: string;
   quantity: number;
   price: number;
+  designId?: string;
+  designName?: string;
 };
+
+function designLine(item: OrderLineItem) {
+  if (!item.designName && !item.designId) return '';
+  const name = item.designName || 'Selected design';
+  return item.designId ? `\nDesign: ${name} (${item.designId})` : `\nDesign: ${name}`;
+}
 
 export function formatInr(value: number) {
   return `₹${(Number(value) || 0).toLocaleString('en-IN', {
@@ -35,7 +43,7 @@ export function formatWhatsAppOrderMessage(input: {
   const products = (input.items.length ? input.items : [{ name: 'Your items', quantity: 1, price: input.total }])
     .map(
       (item) =>
-        `Product Name: ${item.name}\nQuantity: ${item.quantity}\nPrice: ${formatInr(item.price)}`
+        `Product Name: ${item.name}${designLine(item)}\nQuantity: ${item.quantity}\nPrice: ${formatInr(item.price)}`
     )
     .join('\n\n');
 
@@ -72,7 +80,8 @@ export function spokenOrderScript(input: {
   const name = input.customerName.trim() || 'customer';
   const products = (input.items.length ? input.items : []).map((item) => {
     const line = (Number(item.price) || 0) * (Number(item.quantity) || 1);
-    return `${item.name}, quantity ${item.quantity}, price ${line.toLocaleString('en-IN')} rupees`;
+    const design = item.designName ? `, design ${item.designName}` : '';
+    return `${item.name}${design}, quantity ${item.quantity}, price ${line.toLocaleString('en-IN')} rupees`;
   });
   const productSpeech = products.length
     ? ` You ordered: ${products.join('. ')}.`

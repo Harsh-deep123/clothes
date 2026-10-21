@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, ArrowRight, Heart, Check } from 'lucide-react';
-import { Product } from '../types';
+import { Product, ProductDesign } from '../types';
 import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
 import { formatINR } from '../lib/money';
-import { imagesForColor, priceForSize, productHasSizes } from '../catalog';
+import { imagesForColor, priceForSize, productDesigns, productHasColors, productHasSizes } from '../catalog';
 
 interface QuickViewModalProps {
   product: Product | null;
   onClose: () => void;
-  onAddToCart: (product: Product, selectedColor: string, selectedSize: string) => void;
+  onAddToCart: (product: Product, selectedColor: string, selectedSize: string, design?: ProductDesign) => void;
   onViewFullDetails: (product: Product) => void;
   isWishlisted: boolean;
   onToggleWishlist: (productId: string) => void;
@@ -23,13 +23,26 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
   isWishlisted,
   onToggleWishlist,
 }) => {
+  const [selectedColor, setSelectedColor] = useState<string>(product?.colors[0]?.name || 'Standard');
+  const [selectedSize, setSelectedSize] = useState<string>(
+    product?.sizes.find((s) => s.available)?.size || product?.sizes[0]?.size || 'M'
+  );
+  const designOptions = useMemo(() => (product ? productDesigns(product) : []), [product]);
+  const [selectedDesignId, setSelectedDesignId] = useState(designOptions[0]?.id || '');
+  const selectedDesign = designOptions.find((design) => design.id === selectedDesignId) || designOptions[0];
+
+  useEffect(() => {
+    if (!product) return;
+    setSelectedColor(product.colors[0]?.name || 'Standard');
+    setSelectedSize(product.sizes.find((s) => s.available)?.size || product.sizes[0]?.size || 'M');
+    setSelectedDesignId(productDesigns(product)[0]?.id || '');
+  }, [product]);
+
   if (!product) return null;
 
-  const [selectedColor, setSelectedColor] = useState<string>(product.colors[0]?.name || 'Standard');
-  const [selectedSize, setSelectedSize] = useState<string>(
-    product.sizes.find((s) => s.available)?.size || product.sizes[0]?.size || 'M'
-  );
-  const quickImages = imagesForColor(product, selectedColor).filter(Boolean);
+  const quickImages = selectedDesign?.image
+    ? [selectedDesign.image]
+    : imagesForColor(product, selectedColor).filter(Boolean);
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
@@ -81,7 +94,34 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
               {product.description}
             </p>
 
+            {designOptions.length > 0 && selectedDesign && (
+              <div className="mb-5">
+                <span className="text-[11px] uppercase tracking-wider font-semibold text-black block mb-2">
+                  Design: {selectedDesign.name}
+                </span>
+                <div className="flex gap-2 overflow-x-auto">
+                  {designOptions.map((design) => (
+                    <button
+                      key={design.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDesignId(design.id);
+                        if (design.color?.trim()) setSelectedColor(design.color.trim());
+                      }}
+                      className={`shrink-0 w-14 text-left bg-white ${
+                        selectedDesign.id === design.id ? 'ring-2 ring-black' : 'ring-1 ring-[#cfc4c5]'
+                      }`}
+                    >
+                      <img src={design.image} alt="" className="w-full h-16 object-cover" />
+                      <span className="block px-1 py-0.5 text-[10px] truncate">{design.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Colors */}
+            {productHasColors(product) && (
             <div className="mb-5">
               <span className="text-[11px] uppercase tracking-wider font-semibold text-black block mb-2">
                 Color: {selectedColor}
@@ -101,6 +141,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
                 ))}
               </div>
             </div>
+            )}
 
             {/* Sizes */}
             {productHasSizes(product) && (
@@ -108,21 +149,24 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
               <span className="text-[11px] uppercase tracking-wider font-semibold text-black block mb-2">
                 Size
               </span>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="flex flex-wrap gap-2">
                 {product.sizes.map((s) => (
                   <button
                     key={s.size}
                     disabled={!s.available}
                     onClick={() => setSelectedSize(s.size)}
-                    className={`py-2 text-xs uppercase tracking-wider border text-center transition-colors ${
+                    className={`min-w-[3.75rem] px-2 py-1.5 border text-center transition-colors ${
                       !s.available
-                        ? 'opacity-40 border-[#cfc4c5]/40 cursor-not-allowed'
+                        ? 'opacity-40 border-[#cfc4c5]/40 cursor-not-allowed line-through'
                         : selectedSize === s.size
                         ? 'bg-black text-white border-black font-semibold'
                         : 'border-[#cfc4c5] hover:border-black'
                     }`}
                   >
-                    {s.size}
+                    <span className="block text-xs uppercase tracking-wider">{s.size}</span>
+                    <span className={`block text-[10px] mt-0.5 ${selectedSize === s.size && s.available ? 'text-white/80' : 'text-[#5d5f5f]'}`}>
+                      {formatINR(priceForSize(product, s.size).price)}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -133,7 +177,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
           <div className="space-y-3 pt-4 border-t border-[#cfc4c5]/20">
             <button
               onClick={() => {
-                onAddToCart(product, selectedColor, selectedSize);
+                onAddToCart(product, selectedDesign?.color?.trim() || selectedColor, selectedSize, selectedDesign);
                 onClose();
               }}
               className="w-full py-3.5 bg-black text-white text-xs uppercase tracking-[0.2em] font-semibold hover:bg-neutral-800 transition-colors"

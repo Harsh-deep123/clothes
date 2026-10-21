@@ -10,6 +10,12 @@ export type StoredOrderItem = {
   name: string;
   quantity: number;
   price: number;
+  productId?: string;
+  image?: string;
+  selectedSize?: string;
+  selectedColor?: string;
+  designId?: string;
+  designName?: string;
 };
 
 export type StoredOrder = {
@@ -57,6 +63,8 @@ export type StoredOrder = {
     image?: string;
     selectedSize?: string;
     selectedColor?: string;
+    designId?: string;
+    designName?: string;
     quantity: number;
     price: number;
   }>;

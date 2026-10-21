@@ -2,7 +2,7 @@ import React from 'react';
 import { X, ArrowRight, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { CartItem } from '../types';
 import { formatINR } from '../lib/money';
-import { ONE_SIZE, imagesForColor, productHasColors } from '../catalog';
+import { ONE_SIZE, itemPreviewImage } from '../catalog';
 import type { DeliveryQuote } from '../lib/delivery';
 import { CartBillDetails } from './CartBillDetails';
 
@@ -95,7 +95,7 @@ export const ShoppingBagDrawer: React.FC<ShoppingBagDrawerProps> = ({
                 {/* Product Thumbnail */}
                 <div className="w-24 sm:w-28 h-32 sm:h-36 flex-shrink-0 bg-[#f3f3f4] relative overflow-hidden border border-[#cfc4c5]/20">
                   <img
-                    src={imagesForColor(item.product, item.selectedColor)[0]}
+                    src={itemPreviewImage(item)}
                     alt={item.product.name}
                     className="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition-transform duration-500"
                   />
@@ -112,11 +112,15 @@ export const ShoppingBagDrawer: React.FC<ShoppingBagDrawerProps> = ({
                         {formatINR(item.price * item.quantity)}
                       </span>
                     </div>
-                    {productHasColors(item.product) && (
+                    {item.selectedDesignName && (
+                      <p className="text-sm text-[#5d5f5f]">
+                        Design: {item.selectedDesignName}
+                        {item.selectedDesignId ? ` · ${item.selectedDesignId}` : ''}
+                      </p>
+                    )}
                     <p className="text-sm text-[#5d5f5f] mb-2.5">
                       {item.selectedColor}
                     </p>
-                    )}
                     {item.selectedSize !== ONE_SIZE && (
                     <div className="flex items-center gap-2 mb-3">
                       <span className="border border-[#cfc4c5] px-2 py-0.5 text-[11px] uppercase font-medium tracking-wider text-[#5d5f5f] bg-[#f9f9f9]">

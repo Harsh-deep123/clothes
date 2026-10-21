@@ -185,6 +185,8 @@ export async function apiCreateOrder(payload: {
     image?: string;
     selectedSize?: string;
     selectedColor?: string;
+    designId?: string;
+    designName?: string;
     quantity: number;
     price: number;
   }>;
@@ -193,8 +195,9 @@ export async function apiCreateOrder(payload: {
   handlingCharge?: number;
   discount?: number;
   total: number;
-  paymentMethod?: 'stripe' | 'cod';
+  paymentMethod?: 'stripe' | 'cod' | 'gpay' | 'phonepe' | 'paytm';
   paymentStatus?: string;
+  pendingPayment?: boolean;
   stripePaymentIntentId?: string;
   deliveryLocation?: {
     latitude: number;
@@ -207,7 +210,10 @@ export async function apiCreateOrder(payload: {
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
-  const data = (await readJson(response)) as { order?: { id: string; number: string; orderId?: string; createdAt: string } };
+  const data = (await readJson(response)) as {
+    order?: { id: string; number: string; orderId?: string; createdAt: string; paymentStatus?: string; status?: string };
+    error?: string;
+  };
   if (!response.ok || !data.order) throw new Error(errorMessage(data, 'Could not save order.'));
   return data.order;
 }
@@ -252,6 +258,8 @@ export function mapStoredToPlaced(order: Record<string, unknown>): PlacedOrder {
       },
       selectedColor: String(row.selectedColor || ''),
       selectedSize: String(row.selectedSize || ''),
+      selectedDesignId: String(row.designId || row.selectedDesignId || '') || undefined,
+      selectedDesignName: String(row.designName || row.selectedDesignName || '') || undefined,
       quantity: Number(row.quantity) || 1,
       price: Number(row.price) || 0,
     };

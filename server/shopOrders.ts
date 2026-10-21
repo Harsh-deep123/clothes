@@ -1,3 +1,4 @@
+import type { Collection } from 'mongodb';
 import { PRODUCTS } from '../src/data/products';
 import { generateOrderId } from './orderId';
 import { getDb } from './mongo';
@@ -23,6 +24,8 @@ export type CreateShopOrderInput = {
     image?: string;
     selectedSize?: string;
     selectedColor?: string;
+    designId?: string;
+    designName?: string;
     quantity: number;
     price: number;
   }>;
@@ -34,6 +37,7 @@ export type CreateShopOrderInput = {
   paymentMethod?: string;
   paymentStatus?: string;
   stripePaymentIntentId?: string;
+  pendingPayment?: boolean;
   deliveryLocation?: {
     latitude: number;
     longitude: number;
@@ -80,6 +84,48 @@ export async function seedProductsCollection() {
   if (docs.length) await collection.insertMany(docs);
 }
 
+const ONLINE_METHODS = new Set(['stripe', 'gpay', 'phonepe', 'paytm', 'upi']);
+
+function isOnlineMethod(method: string, intentId = '') {
+  return ONLINE_METHODS.has(method) || Boolean(intentId);
+}
+
+function asStored(order: StoredOrder) {
+  return withoutMongoId(order as StoredOrder & Record<string, unknown>) as StoredOrder;
+}
+
+async function markOrderPaid(
+  collection: Collection<StoredOrder>,
+  existing: StoredOrder,
+  paymentMethod: string,
+) {
+  const now = new Date().toISOString();
+  const history = [...(existing.statusHistory || [])];
+  if (!history.some((entry) => entry.status === 'Order Confirmed')) {
+    history.push({ status: 'Order Confirmed', timestamp: now });
+  }
+  const update = {
+    paymentStatus: 'paid',
+    paymentMethod,
+    orderStatus: 'Order Confirmed',
+    status: 'Order Confirmed',
+    statusHistory: history,
+  };
+  await collection.updateOne({ id: existing.id }, { $set: update });
+  return asStored({ ...existing, ...update });
+}
+
+export async function confirmPaidOrderByIntent(paymentIntentId: string): Promise<StoredOrder | null> {
+  const db = await getDb();
+  if (!db || !paymentIntentId) return null;
+  const collection = db.collection<StoredOrder>('orders');
+  const existing = await collection.findOne({ stripePaymentIntentId: paymentIntentId });
+  if (!existing) return null;
+  if (existing.paymentStatus === 'paid') return asStored(existing);
+  await verifyPaidIntent(paymentIntentId, Number(existing.total) || 0);
+  return markOrderPaid(collection, existing, existing.paymentMethod || 'stripe');
+}
+
 export async function createShopOrder(input: CreateShopOrderInput): Promise<StoredOrder> {
   const db = await getDb();
   if (!db) throw new Error('Database is unavailable.');
@@ -91,23 +137,39 @@ export async function createShopOrder(input: CreateShopOrderInput): Promise<Stor
   }
   if (!input.items.length) throw new Error('Order must include at least one product.');
 
-  let stripePaymentIntentId = input.stripePaymentIntentId || '';
-  let paymentMethod = input.paymentMethod || 'Cash on Delivery';
-  let paymentStatus = input.paymentStatus || 'unpaid';
-  if (paymentMethod === 'stripe' || stripePaymentIntentId) {
-    if (!stripePaymentIntentId) throw new Error('Stripe payment is required.');
-    await verifyPaidIntent(stripePaymentIntentId, input.total);
-    const existingPaid = await db.collection<StoredOrder>('orders').findOne({ stripePaymentIntentId });
-    if (existingPaid) throw new Error('This payment was already used.');
-    paymentMethod = 'stripe';
-    paymentStatus = 'paid';
-  } else {
-    paymentMethod = 'cod';
-    paymentStatus = 'unpaid';
+  const collection = db.collection<StoredOrder>('orders');
+  const stripePaymentIntentId = input.stripePaymentIntentId || '';
+  let paymentMethod = input.paymentMethod || 'cod';
+  const gpayDirect = paymentMethod === 'gpay' && !stripePaymentIntentId;
+  const online = isOnlineMethod(paymentMethod, stripePaymentIntentId) && !gpayDirect;
+  const pendingPayment = Boolean(input.pendingPayment || input.paymentStatus === 'pending');
+
+  if (online && !stripePaymentIntentId) {
+    throw new Error('Online payment is required.');
   }
 
-  const collection = db.collection<StoredOrder>('orders');
+  if (gpayDirect) {
+    paymentMethod = 'gpay';
+  } else if (online && stripePaymentIntentId) {
+    const existing = await collection.findOne({ stripePaymentIntentId });
+    if (pendingPayment) {
+      if (existing) return asStored(existing);
+    } else {
+      await verifyPaidIntent(stripePaymentIntentId, input.total);
+      if (existing) {
+        if (existing.paymentStatus === 'paid') return asStored(existing);
+        return markOrderPaid(collection, existing, paymentMethod);
+      }
+      paymentMethod = ONLINE_METHODS.has(paymentMethod) ? paymentMethod : 'stripe';
+    }
+  } else if (!gpayDirect) {
+    paymentMethod = 'cod';
+  }
+
   const createdAt = new Date().toISOString();
+  const confirmed = gpayDirect || !online || !pendingPayment;
+  const paymentStatus = gpayDirect ? 'unpaid' : confirmed ? (online ? 'paid' : 'unpaid') : 'pending';
+  const orderStatus = confirmed ? 'Order Confirmed' : 'Payment Pending';
   let lastError: unknown;
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -128,10 +190,18 @@ export async function createShopOrder(input: CreateShopOrderInput): Promise<Stor
         productId: item.productId,
         name: item.name,
         image: item.image || '',
+        selectedSize: item.selectedSize,
+        selectedColor: item.selectedColor,
+        designId: item.designId || '',
+        designName: item.designName || '',
         quantity: item.quantity,
         price: item.price,
       })),
-      products: input.items,
+      products: input.items.map((item) => ({
+        ...item,
+        designId: item.designId || '',
+        designName: item.designName || '',
+      })),
       subtotal: input.subtotal,
       total: input.total,
       deliveryCharge: input.deliveryCharge,
@@ -139,12 +209,12 @@ export async function createShopOrder(input: CreateShopOrderInput): Promise<Stor
       paymentMethod,
       paymentStatus,
       stripePaymentIntentId: stripePaymentIntentId || undefined,
-      orderStatus: 'Order Confirmed',
-      status: 'Order Confirmed',
+      orderStatus,
+      status: orderStatus,
       trackingId: '',
       deliveryPartner: '',
       expectedDeliveryDate: '',
-      statusHistory: [{ status: 'Order Confirmed', timestamp: createdAt }],
+      statusHistory: [{ status: orderStatus, timestamp: createdAt }],
       confirmationCallSent: false,
       confirmationCallStatus: 'pending',
       whatsappMessageSent: false,
@@ -168,6 +238,18 @@ export async function createShopOrder(input: CreateShopOrderInput): Promise<Stor
     } catch (error) {
       lastError = error;
       const code = (error as { code?: number }).code;
+      if (code === 11000 && stripePaymentIntentId) {
+        const existing = await collection.findOne({ stripePaymentIntentId });
+        if (existing) {
+          if (pendingPayment || existing.paymentStatus === 'paid') return asStored(existing);
+          if (online && !pendingPayment) {
+            await verifyPaidIntent(stripePaymentIntentId, input.total);
+            return markOrderPaid(collection, existing, paymentMethod);
+          }
+          return asStored(existing);
+        }
+        continue;
+      }
       if (code === 11000) continue;
       throw error;
     }

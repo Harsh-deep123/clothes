@@ -17,6 +17,8 @@ export async function requestOrderConfirmationCall(order: PlacedOrder): Promise<
         name: item.product.name,
         quantity: item.quantity,
         price: item.price,
+        designId: item.selectedDesignId,
+        designName: item.selectedDesignName,
       })),
     }),
   });

@@ -2,7 +2,7 @@ import React from 'react';
 import { Minus, Plus, ShoppingBag } from 'lucide-react';
 import { CartItem, ViewScreen } from '../../types';
 import { formatINR } from '../../lib/money';
-import { ONE_SIZE, imagesForColor, productHasColors } from '../../catalog';
+import { ONE_SIZE, itemPreviewImage } from '../../catalog';
 import type { DeliveryQuote } from '../../lib/delivery';
 import { CartBillDetails } from '../CartBillDetails';
 
@@ -59,7 +59,7 @@ export const BagPage: React.FC<BagPageProps> = ({
               >
                 <div className="w-24 sm:w-28 h-32 sm:h-36 flex-shrink-0 bg-[#f3f3f4] overflow-hidden border border-[#cfc4c5]/20">
                   <img
-                    src={imagesForColor(item.product, item.selectedColor)[0]}
+                    src={itemPreviewImage(item)}
                     alt={item.product.name}
                     className="w-full h-full object-cover"
                   />
@@ -70,9 +70,13 @@ export const BagPage: React.FC<BagPageProps> = ({
                       <h2 className="text-base text-black font-medium">{item.product.name}</h2>
                       <span className="font-semibold shrink-0">{formatINR(item.price * item.quantity)}</span>
                     </div>
-                    {productHasColors(item.product) && (
-                      <p className="text-sm text-[#5d5f5f] mt-1">Color: {item.selectedColor}</p>
+                    {item.selectedDesignName && (
+                      <p className="text-sm text-[#5d5f5f] mt-1">
+                        Design: {item.selectedDesignName}
+                        {item.selectedDesignId ? ` · ${item.selectedDesignId}` : ''}
+                      </p>
                     )}
+                    <p className="text-sm text-[#5d5f5f] mt-1">Color: {item.selectedColor}</p>
                     {item.selectedSize !== ONE_SIZE && (
                       <p className="text-sm text-[#5d5f5f]">Size: {item.selectedSize}</p>
                     )}

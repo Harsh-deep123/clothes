@@ -29,6 +29,7 @@ export const STORE_SECTION_CATEGORIES: { slug: string; name: string }[] = [
   { slug: 'home-decor', name: 'Home & Decor' },
   { slug: 'auto-electrical', name: 'Auto & Electrical Parts' },
   { slug: 'accessories', name: 'Accessories' },
+  { slug: 'stationery-office', name: 'Stationery & Office' },
 ];
 
 export const CATEGORIES: CategoryInfo[] = [
@@ -112,6 +113,22 @@ export const CATEGORIES: CategoryInfo[] = [
     description: sub.name,
     gridSpan: 'md:col-span-1',
   })),
+  {
+    id: 'jewellery',
+    name: 'Jewellery & Accessories',
+    slug: 'jewellery',
+    image: '/images/new-standard-editorial.jpg',
+    description: 'Jewellery and accessories',
+    gridSpan: 'md:col-span-1',
+  },
+  {
+    id: 'kitchen',
+    name: 'Kitchen',
+    slug: 'kitchen',
+    image: '/images/new-standard-editorial.jpg',
+    description: 'Kitchen and cookware',
+    gridSpan: 'md:col-span-1',
+  },
 ];
 
 export function isHealthBeautyCategory(slug: string | null | undefined): boolean {
@@ -124,6 +141,8 @@ export function isWomenCategory(slug: string | null | undefined): boolean {
 
 export function isAddedStoreCategory(slug: string | null | undefined): boolean {
   return (
+    slug === 'jewellery' ||
+    slug === 'kitchen' ||
     isWomenCategory(slug) ||
     isHealthBeautyCategory(slug) ||
     STORE_SECTION_CATEGORIES.some((section) => section.slug === slug)

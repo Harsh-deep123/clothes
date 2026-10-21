@@ -1,6 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import type { PlacedOrder } from '../types';
+import { itemPreviewImage } from '../catalog';
 import { formatINR } from '../lib/money';
 import {
   TRACKING_MESSAGES,
@@ -113,13 +114,19 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({ order, o
         <div className="space-y-4 text-sm">
           {order.items.map((item) => (
             <div key={item.id} className="flex gap-3">
-              {item.product.images[0] ? (
-                <img src={item.product.images[0]} alt="" className="w-12 h-16 object-cover bg-white border border-[#cfc4c5]/20" />
+              {itemPreviewImage(item) ? (
+                <img src={itemPreviewImage(item)} alt="" className="w-12 h-16 object-cover bg-white border border-[#cfc4c5]/20" />
               ) : (
                 <div className="w-12 h-16 bg-[#f9f9f9] border border-[#cfc4c5]/20" />
               )}
               <div className="flex-grow">
                 <p className="font-medium text-black">{item.product.name}</p>
+                {item.selectedDesignName && (
+                  <p className="text-[#5d5f5f]">
+                    Design: {item.selectedDesignName}
+                    {item.selectedDesignId ? ` · ${item.selectedDesignId}` : ''}
+                  </p>
+                )}
                 <p className="text-[#5d5f5f]">Qty {item.quantity}</p>
               </div>
               <p className="font-semibold">{formatINR(item.price * item.quantity)}</p>

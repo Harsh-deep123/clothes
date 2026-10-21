@@ -3,6 +3,7 @@ import { bearerToken, signAuthToken, verifyAdminToken } from './jwt';
 import { assignOrderDeliveryPerson, deliveryPersonStats, findStoredOrder, listOrdersForDeliveryPerson, updateOrderTracking } from './orderStore';
 import { isTrackingStatus } from '../src/lib/orderTracking';
 import { listAllReviewsForAdmin, moderateReview } from './reviewStore';
+import { readProductImage, saveCatalogProduct, saveProductImageSource } from './productImages';
 import {
   createDeliveryPerson,
   deleteDeliveryPerson,
@@ -62,6 +63,56 @@ export async function handleAdminOrderApi(req: IncomingMessage, res: ServerRespo
   try {
     const url = (req.url || '').split('?')[0];
     const method = (req.method || 'GET').toUpperCase();
+
+    const mediaFile = url.match(/^\/api\/admin\/media\/([^/]+)$/);
+    if (mediaFile && method === 'GET') {
+      const file = await readProductImage(decodeURIComponent(mediaFile[1]));
+      if (!file) {
+        json(res, 404, { error: 'Image not found.' });
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader('Content-Type', file.mime);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.end(file.data);
+      return;
+    }
+
+    if (url === '/api/admin/media' && method === 'POST') {
+      if (!requireAdmin(req)) {
+        json(res, 401, { error: 'Admin sign in required.' });
+        return;
+      }
+      const payload = JSON.parse((await readBody(req)) || '{}') as Record<string, unknown>;
+      const source = str(payload.dataUrl) || str(payload.sourceUrl);
+      const saved = await saveProductImageSource(source);
+      if ('error' in saved) {
+        json(res, saved.status, { error: saved.error });
+        return;
+      }
+      json(res, 201, saved);
+      return;
+    }
+
+    if (url === '/api/admin/products' && method === 'PUT') {
+      if (!requireAdmin(req)) {
+        json(res, 401, { error: 'Admin sign in required.' });
+        return;
+      }
+      const payload = JSON.parse((await readBody(req)) || '{}') as Record<string, unknown>;
+      try {
+        const saved = await saveCatalogProduct(payload);
+        if ('error' in saved) {
+          json(res, saved.status, { error: saved.error });
+          return;
+        }
+        json(res, 200, saved);
+      } catch (error) {
+        json(res, 400, { error: error instanceof Error ? error.message : 'Could not save the product images.' });
+      }
+      return;
+    }
 
     if (url === '/api/admin/login' && method === 'POST') {
       const payload = JSON.parse((await readBody(req)) || '{}') as Record<string, unknown>;
