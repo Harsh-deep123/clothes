@@ -8,6 +8,7 @@ import {
   LOW_STOCK_THRESHOLD,
 } from '../catalog';
 import { useAdminCatalog, useAdminCategories } from '../hooks/useCatalog';
+import { deleteProductRecord } from '../lib/productMedia';
 import { formatINR } from '../lib/money';
 
 interface AdminProductsProps {
@@ -53,11 +54,16 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onCreate, onEdit, 
     return list;
   }, [products, query, category, sale, status, sort]);
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!pendingDelete) return;
-    deleteProduct(pendingDelete.id);
-    notify(`${pendingDelete.name} deleted.`, 'success');
-    setPendingDelete(null);
+    try {
+      await deleteProductRecord(pendingDelete.id);
+      deleteProduct(pendingDelete.id);
+      notify(`${pendingDelete.name} deleted.`, 'success');
+      setPendingDelete(null);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Could not delete the product.', 'error');
+    }
   };
 
   return (

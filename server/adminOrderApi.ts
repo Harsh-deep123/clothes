@@ -3,7 +3,7 @@ import { bearerToken, signAuthToken, verifyAdminToken } from './jwt';
 import { assignOrderDeliveryPerson, deliveryPersonStats, findStoredOrder, listOrdersForDeliveryPerson, updateOrderTracking } from './orderStore';
 import { isTrackingStatus } from '../src/lib/orderTracking';
 import { listAllReviewsForAdmin, moderateReview } from './reviewStore';
-import { readProductImage, saveCatalogProduct, saveProductImageSource } from './productImages';
+import { deleteCatalogProduct, readProductImage, saveCatalogProduct, saveProductImageSource } from './productImages';
 import {
   createDeliveryPerson,
   deleteDeliveryPerson,
@@ -111,6 +111,21 @@ export async function handleAdminOrderApi(req: IncomingMessage, res: ServerRespo
       } catch (error) {
         json(res, 400, { error: error instanceof Error ? error.message : 'Could not save the product images.' });
       }
+      return;
+    }
+
+    const deleteProduct = url.match(/^\/api\/admin\/products\/([^/]+)$/);
+    if (deleteProduct && method === 'DELETE') {
+      if (!requireAdmin(req)) {
+        json(res, 401, { error: 'Admin sign in required.' });
+        return;
+      }
+      const deleted = await deleteCatalogProduct(decodeURIComponent(deleteProduct[1]));
+      if ('error' in deleted) {
+        json(res, deleted.status, { error: deleted.error });
+        return;
+      }
+      json(res, 200, deleted);
       return;
     }
 

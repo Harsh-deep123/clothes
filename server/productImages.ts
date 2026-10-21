@@ -148,6 +148,28 @@ async function keepImage(value: unknown) {
   return source;
 }
 
+export async function listCatalogProducts() {
+  const db = await getDb();
+  if (!db) return [];
+  const docs = await db.collection('products').find({}).toArray();
+  return docs
+    .map((doc) => {
+      const row = { ...(doc as Record<string, unknown>) };
+      delete row._id;
+      return row;
+    })
+    .filter((row) => typeof row.id === 'string' && row.id.trim());
+}
+
+export async function deleteCatalogProduct(id: string) {
+  const db = await getDb();
+  if (!db) return { error: 'Database is unavailable.', status: 503 as const };
+  const productId = id.trim();
+  if (!productId) return { error: 'Product id is required.', status: 400 as const };
+  await db.collection('products').deleteOne({ id: productId });
+  return { ok: true as const };
+}
+
 export async function saveCatalogProduct(raw: Record<string, unknown>) {
   const db = await getDb();
   if (!db) return { error: 'Database is unavailable.', status: 503 as const };

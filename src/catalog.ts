@@ -59,22 +59,51 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
+function normalizeAdminProduct(p: Partial<AdminProduct>, index = 0): AdminProduct {
+  const asProduct = {
+    id: typeof p.id === 'string' && p.id.trim() ? p.id.trim() : `product-${index}`,
+    name: typeof p.name === 'string' && p.name.trim() ? p.name : 'Product',
+    subtitle: p.subtitle,
+    price: Number(p.price) || 0,
+    originalPrice: p.originalPrice,
+    category: typeof p.category === 'string' ? p.category : 'new-arrivals',
+    categoryLabel: typeof p.categoryLabel === 'string' && p.categoryLabel ? p.categoryLabel : String(p.category || 'Store'),
+    breadcrumb: typeof p.breadcrumb === 'string' ? p.breadcrumb : '',
+    images: Array.isArray(p.images) ? p.images.filter((url): url is string => typeof url === 'string' && Boolean(url)) : [],
+    colors: Array.isArray(p.colors) ? (p.colors as Product['colors']) : [],
+    sizes: Array.isArray(p.sizes) && p.sizes.length ? (p.sizes as Product['sizes']) : [{ size: 'One Size', available: true }],
+    description: typeof p.description === 'string' ? p.description : '',
+    detailsAndCare: Array.isArray(p.detailsAndCare) ? p.detailsAndCare.filter((item): item is string => typeof item === 'string') : [],
+    shippingAndReturns: typeof p.shippingAndReturns === 'string' ? p.shippingAndReturns : '',
+    isNew: Boolean(p.isNew),
+    isSale: Boolean(p.isSale),
+    material: p.material,
+    hasSizes: p.hasSizes,
+    hasColors: p.hasColors,
+    designs: p.designs,
+    returnPolicy: p.returnPolicy,
+  } as Product;
+  return {
+    ...seedAdminProduct(asProduct, index),
+    ...p,
+    ...asProduct,
+    listPrice: Number(p.listPrice) || Number(p.originalPrice) || Number(p.price) || asProduct.price,
+    stock: typeof p.stock === 'number' ? p.stock : 12,
+    active: p.active !== false,
+    discountEnabled: Boolean(p.discountEnabled),
+    discountType: p.discountType === 'amount' ? 'amount' : 'percent',
+    discountValue: Number(p.discountValue) || 0,
+    saleEnabled: Boolean(p.saleEnabled || p.isSale),
+    saleStart: typeof p.saleStart === 'string' ? p.saleStart : '',
+    saleEnd: typeof p.saleEnd === 'string' ? p.saleEnd : '',
+    purchasedFrom: typeof p.purchasedFrom === 'string' ? p.purchasedFrom : '',
+  };
+}
+
 function loadRawCatalog(): AdminProduct[] {
   const stored = readJson<AdminProduct[] | null>(CATALOG_KEY, null);
   if (stored && stored.length) {
-    return stored.map((p) => ({
-      ...seedAdminProduct(p, 0),
-      ...p,
-      listPrice: p.listPrice || p.originalPrice || p.price,
-      stock: typeof p.stock === 'number' ? p.stock : 12,
-      active: p.active !== false,
-      discountEnabled: Boolean(p.discountEnabled),
-      discountType: p.discountType === 'amount' ? 'amount' : 'percent',
-      discountValue: Number(p.discountValue) || 0,
-      saleEnabled: Boolean(p.saleEnabled || p.isSale),
-      saleStart: p.saleStart || '',
-      saleEnd: p.saleEnd || '',
-    }));
+    return stored.map((p, i) => normalizeAdminProduct(p, i));
   }
   return PRODUCTS.map((p, i) => seedAdminProduct(p, i));
 }
@@ -296,6 +325,44 @@ export function getStorefrontProduct(id: string): Product | undefined {
 export function saveCatalog(next: AdminProduct[]) {
   catalog = next.map((p) => ({ ...p }));
   persist();
+}
+
+let hydrateInFlight: Promise<AdminProduct[]> | null = null;
+
+export async function hydrateCatalogFromServer(): Promise<AdminProduct[]> {
+  if (hydrateInFlight) return hydrateInFlight;
+  hydrateInFlight = (async () => {
+    const response = await fetch('/api/shop/products', { headers: { Accept: 'application/json' } });
+    const data = (await response.json().catch(() => ({}))) as { products?: unknown; error?: string };
+    if (!response.ok) throw new Error(data.error || 'Could not load products.');
+    const remote = Array.isArray(data.products)
+      ? data.products
+          .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+          .map((item, index) => normalizeAdminProduct(item as Partial<AdminProduct>, index))
+          .filter((item) => item.id)
+      : [];
+    if (!remote.length) return [];
+    const remoteIds = new Set(remote.map((item) => item.id));
+    const seedIds = new Set(PRODUCTS.map((item) => item.id));
+    const extras = catalog.filter((item) => item.id && !remoteIds.has(item.id) && !seedIds.has(item.id));
+    catalog = [...extras, ...remote];
+    persist();
+    return extras;
+  })().finally(() => {
+    hydrateInFlight = null;
+  });
+  return hydrateInFlight;
+}
+
+if (typeof window !== 'undefined') {
+  void hydrateCatalogFromServer().then((extras) => {
+    if (!extras.length) return;
+    void import('./lib/productMedia').then(({ saveProductRecord }) => {
+      extras.forEach((product) => {
+        void saveProductRecord(product).catch(() => undefined);
+      });
+    });
+  }).catch(() => undefined);
 }
 
 export function upsertProduct(product: AdminProduct) {

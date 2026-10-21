@@ -73,3 +73,17 @@ export async function saveProductRecord(product: AdminProduct) {
   const data = (await response.json().catch(() => ({}))) as { error?: string };
   if (!response.ok) throw new Error(data.error || 'Could not save the product in the database.');
 }
+
+export async function deleteProductRecord(productId: string) {
+  const token = getAdminToken();
+  if (!token) throw new Error('Sign in again so this product can be deleted.');
+  const response = await fetch(`/api/admin/products/${encodeURIComponent(productId)}`, {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const data = (await response.json().catch(() => ({}))) as { error?: string };
+  if (!response.ok) throw new Error(data.error || 'Could not delete the product in the database.');
+}

@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import { bearerToken, signAuthToken, verifyAuthToken } from './jwt';
 import { seedProductsCollection, createShopOrder, getOrderByOrderId, listOrdersForUser, normalizeDeliveryLocation } from './shopOrders';
+import { listCatalogProducts } from './productImages';
 import { sendRegistrationOtp, verifyRegistrationOtp } from './otpStore';
 import { createUser, findUserById, updateUserProfile, verifyUser } from './userStore';
 
@@ -172,6 +173,11 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       return;
     }
     json(res, 200, { user });
+    return;
+  }
+
+  if (url === '/api/shop/products' && method === 'GET') {
+    json(res, 200, { products: await listCatalogProducts() });
     return;
   }
 
