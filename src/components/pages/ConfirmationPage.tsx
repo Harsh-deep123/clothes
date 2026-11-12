@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { PlacedOrder, ViewScreen } from '../../types';
 import { formatINR } from '../../lib/money';
+import { ONE_SIZE } from '../../catalog';
 import { requestOrderConfirmationCall, shouldStartConfirmationCall } from '../../lib/confirmationCall';
 import { fetchPendingReviews, type PendingReviewItem } from '../../lib/reviewsApi';
 import { getAuthToken } from '../../lib/shopApi';
@@ -122,7 +123,9 @@ export const ConfirmationPage: React.FC<ConfirmationPageProps> = ({
                 <span>
                   {item.product.name}
                   {item.selectedDesignName ? ` · ${item.selectedDesignName}` : ''}
-                  {item.selectedDesignId ? ` (${item.selectedDesignId})` : ''} × {item.quantity}
+                  {item.selectedDesignId ? ` (${item.selectedDesignId})` : ''}
+                  {item.selectedSize && item.selectedSize !== ONE_SIZE ? ` · Size ${item.selectedSize}` : ''}
+                  {item.customName ? ` · Name ${item.customName}` : ''} × {item.quantity}
                 </span>
                 <span className="text-black">{formatINR(item.price * item.quantity)}</span>
               </div>

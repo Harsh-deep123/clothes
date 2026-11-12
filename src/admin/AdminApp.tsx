@@ -10,9 +10,10 @@ import { AdminCategories } from './AdminCategories';
 import { AdminReturns } from './AdminReturns';
 import { AdminOrders } from './AdminOrders';
 import { AdminReviews } from './AdminReviews';
+import { AdminPricingTools } from './AdminPricingTools';
 
 type AdminRoute = {
-  page: 'login' | 'dashboard' | 'products' | 'product-form' | 'categories' | 'returns' | 'orders' | 'reviews';
+  page: 'login' | 'dashboard' | 'products' | 'product-form' | 'categories' | 'returns' | 'orders' | 'reviews' | 'pricing';
   productId?: string | null;
 };
 
@@ -29,6 +30,7 @@ function parseAdminPath(pathname: string): AdminRoute {
   if (path === '/admin/returns') return { page: 'returns' };
   if (path === '/admin/orders') return { page: 'orders' };
   if (path === '/admin/reviews') return { page: 'reviews' };
+  if (path === '/admin/pricing') return { page: 'pricing' };
   return { page: 'dashboard' };
 }
 
@@ -42,6 +44,7 @@ function pathFor(route: AdminRoute) {
   if (route.page === 'returns') return '/admin/returns';
   if (route.page === 'orders') return '/admin/orders';
   if (route.page === 'reviews') return '/admin/reviews';
+  if (route.page === 'pricing') return '/admin/pricing';
   return '/admin/dashboard';
 }
 
@@ -108,6 +111,8 @@ export default function AdminApp() {
           ? 'orders'
           : route.page === 'reviews'
             ? 'reviews'
+            : route.page === 'pricing'
+              ? 'pricing'
           : route.page === 'dashboard'
             ? 'dashboard'
             : 'products';
@@ -122,6 +127,8 @@ export default function AdminApp() {
             ? 'Orders'
             : route.page === 'reviews'
               ? 'Product Reviews'
+              : route.page === 'pricing'
+                ? 'Pricing & Delivery'
             : route.page === 'product-form'
               ? route.productId
                 ? 'Edit product'
@@ -165,6 +172,7 @@ export default function AdminApp() {
         {route.page === 'returns' && <AdminReturns notify={notify} />}
         {route.page === 'orders' && <AdminOrders notify={notify} />}
         {route.page === 'reviews' && <AdminReviews notify={notify} />}
+        {route.page === 'pricing' && <AdminPricingTools notify={notify} />}
       </AdminLayout>
 
       {toast && (

@@ -12,8 +12,8 @@ type DeliveryOrder = {
   customerName: string;
   customerPhone: string;
   deliveryAddress?: string;
-  items?: Array<{ name: string; quantity: number }>;
-  products?: Array<{ name: string; quantity: number }>;
+  items?: Array<{ name: string; quantity: number; selectedSize?: string }>;
+  products?: Array<{ name: string; quantity: number; selectedSize?: string }>;
   total: number;
   status?: string;
   orderStatus?: string;
@@ -55,7 +55,15 @@ function mapsDirectionsUrl(order: DeliveryOrder) {
 
 function productLabel(order: DeliveryOrder) {
   const rows = (order.products && order.products.length ? order.products : order.items) || [];
-  return rows.map((item) => `${item.name} × ${item.quantity}`).join(', ') || '—';
+  return (
+    rows
+      .map((item) => {
+        const size =
+          item.selectedSize && !/^one[\s-]?size$/i.test(item.selectedSize) ? ` · Size ${item.selectedSize}` : '';
+        return `${item.name}${size} × ${item.quantity}`;
+      })
+      .join(', ') || '—'
+  );
 }
 
 export const DeliveryDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {

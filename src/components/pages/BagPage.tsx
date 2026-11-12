@@ -80,6 +80,9 @@ export const BagPage: React.FC<BagPageProps> = ({
                     {item.selectedSize !== ONE_SIZE && (
                       <p className="text-sm text-[#5d5f5f]">Size: {item.selectedSize}</p>
                     )}
+                    {item.customName && (
+                      <p className="text-sm text-[#5d5f5f]">Name: {item.customName}</p>
+                    )}
                   </div>
                   <div className="flex justify-between items-center pt-3">
                     <div className="flex items-center border border-[#cfc4c5]">

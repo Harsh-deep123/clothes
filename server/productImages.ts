@@ -148,17 +148,20 @@ async function keepImage(value: unknown) {
   return source;
 }
 
-export async function listCatalogProducts() {
+export async function listCatalogProducts(options?: { activeOnly?: boolean }) {
   const db = await getDb();
   if (!db) return [];
-  const docs = await db.collection('products').find({}).toArray();
-  return docs
-    .map((doc) => {
-      const row = { ...(doc as Record<string, unknown>) };
-      delete row._id;
-      return row;
+  const filter = options?.activeOnly ? { active: { $ne: false } } : {};
+  const docs = await db
+    .collection('products')
+    .find(filter)
+    .project({
+      _id: 0,
+      averageRating: 0,
+      totalReviews: 0,
     })
-    .filter((row) => typeof row.id === 'string' && row.id.trim());
+    .toArray();
+  return docs.filter((row) => typeof row.id === 'string' && Boolean(row.id.trim()));
 }
 
 export async function deleteCatalogProduct(id: string) {
@@ -197,9 +200,16 @@ export async function saveCatalogProduct(raw: Record<string, unknown>) {
       )
     : raw.designs;
 
+  const existing = await db.collection('products').findOne({ id }, { projection: { sku: 1 } });
+  const { ensureProductSku } = await import('./productSku');
+  const sku = await ensureProductSku(db, {
+    sku: typeof raw.sku === 'string' && raw.sku.trim() ? raw.sku : existing?.sku,
+  });
+
   const product = {
     ...raw,
     id,
+    sku,
     images: images.filter(Boolean),
     colors,
     designs,

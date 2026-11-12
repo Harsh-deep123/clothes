@@ -62,6 +62,7 @@ function readJson<T>(key: string, fallback: T): T {
 function normalizeAdminProduct(p: Partial<AdminProduct>, index = 0): AdminProduct {
   const asProduct = {
     id: typeof p.id === 'string' && p.id.trim() ? p.id.trim() : `product-${index}`,
+    sku: typeof p.sku === 'string' && p.sku.trim() ? p.sku.trim().toUpperCase() : undefined,
     name: typeof p.name === 'string' && p.name.trim() ? p.name : 'Product',
     subtitle: p.subtitle,
     price: Number(p.price) || 0,
@@ -82,6 +83,7 @@ function normalizeAdminProduct(p: Partial<AdminProduct>, index = 0): AdminProduc
     hasColors: p.hasColors,
     designs: p.designs,
     returnPolicy: p.returnPolicy,
+    namingEnabled: Boolean(p.namingEnabled),
   } as Product;
   return {
     ...seedAdminProduct(asProduct, index),
@@ -97,6 +99,7 @@ function normalizeAdminProduct(p: Partial<AdminProduct>, index = 0): AdminProduc
     saleStart: typeof p.saleStart === 'string' ? p.saleStart : '',
     saleEnd: typeof p.saleEnd === 'string' ? p.saleEnd : '',
     purchasedFrom: typeof p.purchasedFrom === 'string' ? p.purchasedFrom : '',
+    namingEnabled: Boolean(p.namingEnabled),
   };
 }
 
@@ -252,16 +255,26 @@ export function productHasColors(product: Pick<Product, 'hasColors'>): boolean {
 }
 
 export function toStorefrontProduct(product: AdminProduct): Product {
+  const listPrice = Number(product.listPrice) || Number(product.price) || 0;
+  // Prefer the stored sell price (already DeoDap/+markup). Do not fall back to MRP
+  // when a sale flag is off — that made storefront prices look much higher than DeoDap.
+  const storedSell = Number(product.price) || 0;
   const live = isSaleLive(product);
-  const listPrice = product.listPrice || product.price;
-  const price = live ? calculateSalePrice(product) : listPrice;
+  const computedSale = live ? calculateSalePrice(product) : 0;
+  const price =
+    storedSell > 0
+      ? storedSell
+      : computedSale > 0
+        ? computedSale
+        : listPrice;
+  const onSale = listPrice > 0 && price > 0 && price < listPrice;
   const outOfStock = product.stock <= 0;
   const { purchasedFrom: _adminOnly, ...storefront } = product;
   return {
     ...storefront,
     price,
-    originalPrice: live ? listPrice : undefined,
-    isSale: live,
+    originalPrice: onSale ? listPrice : undefined,
+    isSale: onSale,
     sizes: productHasSizes(product)
       ? product.sizes.map((s) => ({ ...s, available: outOfStock ? false : s.available }))
       : [{ size: ONE_SIZE, available: !outOfStock }],
@@ -282,8 +295,13 @@ export function getCatalogProduct(id: string): AdminProduct | undefined {
 
 export function priceForSize(product: Product, size?: string): { price: number; originalPrice?: number } {
   const sizeList = product.sizes.find((s) => s.size === size)?.price;
+  // Size MRP is optional. Always prefer the product sell price when size has no own sale price.
   if (!sizeList || !(sizeList > 0)) {
     return { price: product.price, originalPrice: product.originalPrice };
+  }
+  // If size price is just the MRP and product already has a lower sell price, keep sell price.
+  if (product.price > 0 && product.price < sizeList) {
+    return { price: product.price, originalPrice: sizeList };
   }
   if (!product.isSale) return { price: sizeList };
   const discount = product.discountValue || 0;
@@ -345,6 +363,12 @@ export async function hydrateCatalogFromServer(): Promise<AdminProduct[]> {
     const remoteIds = new Set(remote.map((item) => item.id));
     const seedIds = new Set(PRODUCTS.map((item) => item.id));
     const extras = catalog.filter((item) => item.id && !remoteIds.has(item.id) && !seedIds.has(item.id));
+    // Large server catalogs (e.g. DeoDap import) must not be written to localStorage.
+    if (remote.length > 400) {
+      catalog = remote;
+      notify();
+      return [];
+    }
     catalog = [...extras, ...remote];
     persist();
     return extras;

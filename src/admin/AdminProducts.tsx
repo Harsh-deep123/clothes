@@ -35,6 +35,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onCreate, onEdit, 
         (p) =>
           p.name.toLowerCase().includes(q) ||
           p.id.toLowerCase().includes(q) ||
+          (p.sku || '').toLowerCase().includes(q) ||
           p.categoryLabel.toLowerCase().includes(q)
       );
     }
@@ -143,7 +144,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({ onCreate, onEdit, 
                       <img src={p.images[0]} alt="" className="w-12 h-16 object-cover rounded-lg bg-slate-100" />
                       <div>
                         <p className="font-medium">{p.name}</p>
-                        <p className="text-xs text-slate-400">{p.id}</p>
+                        <p className="text-xs text-slate-400">ID: {p.sku || p.id}</p>
                       </div>
                     </div>
                   </td>

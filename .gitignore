@@ -6,6 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+tmp/
 data/return-requests.json
 data/orders.json
 data/review-media/

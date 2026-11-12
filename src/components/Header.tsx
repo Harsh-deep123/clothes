@@ -56,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
     { key: 'nav.sale' as MessageKey, id: 'sale', screen: 'new-arrivals' as ViewScreen, category: 'sale', isSale: true },
   ];
 
-  const visibleNavCount = navItems.findIndex((item) => item.id === 'kitchen') + 1;
+  const visibleNavCount = navItems.findIndex((item) => item.id === 'home-decor') + 1;
   const primaryNavItems = navItems.slice(0, visibleNavCount);
   const moreNavItems = navItems.slice(visibleNavCount);
 

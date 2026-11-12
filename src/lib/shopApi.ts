@@ -181,12 +181,14 @@ export async function apiCreateOrder(payload: {
   shippingAddress: SavedAddress | PlacedOrder['shippingAddress'];
   items: Array<{
     productId: string;
+    sku?: string;
     name: string;
     image?: string;
     selectedSize?: string;
     selectedColor?: string;
     designId?: string;
     designName?: string;
+    customName?: string;
     quantity: number;
     price: number;
   }>;
@@ -239,11 +241,13 @@ export function mapStoredToPlaced(order: Record<string, unknown>): PlacedOrder {
     const row = raw as Record<string, unknown>;
     const name = String(row.name || 'Item');
     const productId = String(row.productId || `item-${index}`);
+    const sku = String(row.sku || '').trim() || undefined;
     return {
       id: `${orderId}-${productId}-${index}`,
       productId,
       product: {
         id: productId,
+        sku,
         name,
         price: Number(row.price) || 0,
         category: '',
@@ -260,6 +264,7 @@ export function mapStoredToPlaced(order: Record<string, unknown>): PlacedOrder {
       selectedSize: String(row.selectedSize || ''),
       selectedDesignId: String(row.designId || row.selectedDesignId || '') || undefined,
       selectedDesignName: String(row.designName || row.selectedDesignName || '') || undefined,
+      customName: String(row.customName || '') || undefined,
       quantity: Number(row.quantity) || 1,
       price: Number(row.price) || 0,
     };

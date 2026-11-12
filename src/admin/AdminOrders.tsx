@@ -20,9 +20,13 @@ type AdminOrderCall = {
     name: string;
     quantity: number;
     price: number;
+    productId?: string;
+    sku?: string;
     image?: string;
     designId?: string;
     designName?: string;
+    selectedSize?: string;
+    customName?: string;
   }>;
   total: number;
   paymentMethod?: string;
@@ -265,11 +269,22 @@ export const AdminOrders: React.FC<{ notify?: (message: string, type: 'success' 
                           <p>
                             {item.name} × {item.quantity} · ₹{Number(item.price).toLocaleString('en-IN')}
                           </p>
+                          {(item.sku || item.productId) && (
+                            <p className="text-xs text-slate-600 mt-0.5">
+                              ID: {item.sku || item.productId}
+                            </p>
+                          )}
                           {(item.designName || item.designId) && (
                             <p className="text-xs text-slate-600 mt-0.5">
                               Design: {item.designName || 'Selected design'}
                               {item.designId ? ` · ID ${item.designId}` : ''}
                             </p>
+                          )}
+                          {item.selectedSize && !/^one[\s-]?size$/i.test(item.selectedSize) && (
+                            <p className="text-xs text-slate-600 mt-0.5">Size: {item.selectedSize}</p>
+                          )}
+                          {item.customName && (
+                            <p className="text-xs text-slate-600 mt-0.5">Name: {item.customName}</p>
                           )}
                         </div>
                       </div>

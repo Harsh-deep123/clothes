@@ -20,12 +20,14 @@ export type CreateShopOrderInput = {
   };
   items: Array<{
     productId: string;
+    sku?: string;
     name: string;
     image?: string;
     selectedSize?: string;
     selectedColor?: string;
     designId?: string;
     designName?: string;
+    customName?: string;
     quantity: number;
     price: number;
   }>;
@@ -170,6 +172,33 @@ export async function createShopOrder(input: CreateShopOrderInput): Promise<Stor
   const confirmed = gpayDirect || !online || !pendingPayment;
   const paymentStatus = gpayDirect ? 'unpaid' : confirmed ? (online ? 'paid' : 'unpaid') : 'pending';
   const orderStatus = confirmed ? 'Order Confirmed' : 'Payment Pending';
+  const productIds = [...new Set(input.items.map((item) => item.productId).filter(Boolean))];
+  const catalogRows = productIds.length
+    ? await db
+        .collection('products')
+        .find({ id: { $in: productIds } })
+        .project({ id: 1, sku: 1, name: 1 })
+        .toArray()
+    : [];
+  const skuByProductId = new Map(
+    catalogRows.map((row) => [String(row.id), String(row.sku || '').trim()]),
+  );
+  const enrichedItems = input.items.map((item) => {
+    const sku = (item.sku || skuByProductId.get(item.productId) || '').trim();
+    return {
+      productId: item.productId,
+      sku,
+      name: item.name,
+      image: item.image || '',
+      selectedSize: item.selectedSize,
+      selectedColor: item.selectedColor,
+      designId: item.designId || '',
+      designName: item.designName || '',
+      customName: item.customName || '',
+      quantity: item.quantity,
+      price: item.price,
+    };
+  });
   let lastError: unknown;
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -186,22 +215,8 @@ export async function createShopOrder(input: CreateShopOrderInput): Promise<Stor
       customerEmail: input.customerEmail.trim().toLowerCase(),
       deliveryAddress: addressLine(input.shippingAddress),
       shipping: input.shippingAddress,
-      items: input.items.map((item) => ({
-        productId: item.productId,
-        name: item.name,
-        image: item.image || '',
-        selectedSize: item.selectedSize,
-        selectedColor: item.selectedColor,
-        designId: item.designId || '',
-        designName: item.designName || '',
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      products: input.items.map((item) => ({
-        ...item,
-        designId: item.designId || '',
-        designName: item.designName || '',
-      })),
+      items: enrichedItems,
+      products: enrichedItems,
       subtotal: input.subtotal,
       total: input.total,
       deliveryCharge: input.deliveryCharge,

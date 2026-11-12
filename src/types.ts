@@ -1,5 +1,7 @@
 export interface Product {
   id: string;
+  /** Short unique product code shown to admin on orders, e.g. ZY-000123 */
+  sku?: string;
   name: string;
   subtitle?: string;
   price: number;
@@ -43,6 +45,8 @@ export interface Product {
   hasColors?: boolean;
   /** Alternate looks of the same product. The chosen design is stored on the order. */
   designs?: ProductDesign[];
+  /** When true, customers can type a name to print on the product. */
+  namingEnabled?: boolean;
 }
 
 export interface ProductDesign {
@@ -64,6 +68,8 @@ export interface CartItem {
   /** Set when the customer picks one design of this product. */
   selectedDesignId?: string;
   selectedDesignName?: string;
+  /** Name the customer wants printed on the product. */
+  customName?: string;
   quantity: number;
   price: number;
 }

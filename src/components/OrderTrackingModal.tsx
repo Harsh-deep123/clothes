@@ -127,6 +127,10 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({ order, o
                     {item.selectedDesignId ? ` · ${item.selectedDesignId}` : ''}
                   </p>
                 )}
+                {item.selectedSize && item.selectedSize !== 'One Size' && (
+                  <p className="text-[#5d5f5f]">Size: {item.selectedSize}</p>
+                )}
+                {item.customName && <p className="text-[#5d5f5f]">Name: {item.customName}</p>}
                 <p className="text-[#5d5f5f]">Qty {item.quantity}</p>
               </div>
               <p className="font-semibold">{formatINR(item.price * item.quantity)}</p>

@@ -19,6 +19,45 @@ export type DeliveryQuote = {
   message: string | null;
 };
 
+export type DeliverySettings = {
+  unavailableMessage: string;
+  zones: DeliveryZoneRule[];
+};
+
+let runtimeDeliveryConfig: DeliverySettings = {
+  unavailableMessage: DELIVERY_CONFIG.unavailableMessage,
+  zones: DELIVERY_CONFIG.zones.map((zone) => ({ ...zone })),
+};
+
+export function getRuntimeDeliveryConfig(): DeliverySettings {
+  return {
+    unavailableMessage: runtimeDeliveryConfig.unavailableMessage,
+    zones: runtimeDeliveryConfig.zones.map((zone) => ({ ...zone })),
+  };
+}
+
+export function setRuntimeDeliveryConfig(settings: DeliverySettings) {
+  runtimeDeliveryConfig = {
+    unavailableMessage: settings.unavailableMessage || DELIVERY_CONFIG.unavailableMessage,
+    zones: Array.isArray(settings.zones) && settings.zones.length
+      ? settings.zones.map((zone) => ({ ...zone }))
+      : DELIVERY_CONFIG.zones.map((zone) => ({ ...zone })),
+  };
+}
+
+export async function hydrateDeliveryConfigFromServer(): Promise<DeliverySettings> {
+  try {
+    const response = await fetch('/api/shop/delivery-config', { headers: { Accept: 'application/json' } });
+    const data = (await response.json().catch(() => ({}))) as { settings?: DeliverySettings };
+    if (response.ok && data.settings?.zones?.length) {
+      setRuntimeDeliveryConfig(data.settings);
+    }
+  } catch {
+    /* keep defaults */
+  }
+  return getRuntimeDeliveryConfig();
+}
+
 function norm(value?: string | null): string {
   return (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
@@ -95,11 +134,11 @@ export function getDeliveryQuote(
       zoneLabel: null,
       deliveryCharge: 0,
       handlingCharge: 0,
-      message: DELIVERY_CONFIG.unavailableMessage,
+      message: runtimeDeliveryConfig.unavailableMessage,
     };
   }
 
-  const zone = DELIVERY_CONFIG.zones.find((item) => zoneMatches(item, signals));
+  const zone = runtimeDeliveryConfig.zones.find((item) => zoneMatches(item, signals));
   if (!zone) {
     return {
       available: false,
@@ -107,7 +146,7 @@ export function getDeliveryQuote(
       zoneLabel: null,
       deliveryCharge: 0,
       handlingCharge: 0,
-      message: DELIVERY_CONFIG.unavailableMessage,
+      message: runtimeDeliveryConfig.unavailableMessage,
     };
   }
 

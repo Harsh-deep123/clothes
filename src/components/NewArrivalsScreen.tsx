@@ -37,11 +37,13 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
   const [selectedPriceRange, setSelectedPriceRange] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'price-asc' | 'price-desc' | 'popular'>('newest');
   const [showFilterDrawer, setShowFilterDrawer] = useState<boolean>(false);
-  const [visibleCount, setVisibleCount] = useState<number>(6);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 16;
 
   // Sync category filter if changed from prop
   React.useEffect(() => {
     setSelectedCategory(categoryFilter || 'all');
+    setPage(1);
   }, [categoryFilter]);
 
   const isMenPage = categoryFilter === 'all';
@@ -93,20 +95,18 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
   const filteredProducts = useMemo(() => {
     let list = [...products];
 
-    // Category filter
-    if (categoryFilter === 'jewellery') {
-      list = list.filter((p) => p.category === 'jewellery');
-    } else if (categoryFilter === 'kitchen') {
-      list = list.filter((p) => p.category === 'kitchen');
-    } else if (selectedCategory && selectedCategory !== 'all') {
-      if (selectedCategory === 'sale') {
+    // Category filter — category pages always stay on their own products
+    const lockedCategory = categoryFilter && categoryFilter !== 'all' ? categoryFilter : null;
+    const category = lockedCategory || selectedCategory;
+    if (category && category !== 'all') {
+      if (category === 'sale') {
         list = list.filter((p) => p.isSale || p.price <= 12499);
-      } else if (selectedCategory === 'women') {
+      } else if (category === 'women' || isWomenCategory(category)) {
         list = list.filter((p) => isWomenCategory(p.category));
-      } else if (selectedCategory === 'health-beauty') {
+      } else if (isHealthBeautyCategory(category)) {
         list = list.filter((p) => isHealthBeautyCategory(p.category));
       } else {
-        list = list.filter((p) => p.category === selectedCategory);
+        list = list.filter((p) => p.category === category);
       }
     }
 
@@ -159,9 +159,16 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     setSelectedSize('all');
     setSelectedColor('all');
     setSelectedPriceRange('all');
+    setPage(1);
   };
 
-  const displayedProducts = filteredProducts.slice(0, visibleCount);
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const displayedProducts = filteredProducts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [selectedCategory, selectedSize, selectedColor, selectedPriceRange, sortBy]);
   const pillClass =
     'border border-[#cfc4c5] px-3 py-1.5 text-xs text-[#1a1c1c] hover:border-black transition-colors bg-transparent cursor-pointer uppercase tracking-wider';
 
@@ -173,20 +180,32 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
           id="new-arrivals-heading"
           className="font-serif-luxury text-3xl sm:text-5xl md:text-6xl tracking-tight uppercase text-black font-normal"
         >
-          {selectedCategory === 'all'
-            ? isMenPage
-              ? 'Men'
-              : 'New Arrivals'
-            : categories.find((c) => c.value === selectedCategory)?.label || 'Collection'}
+          {(categoryFilter && categoryFilter !== 'all'
+            ? categories.find((c) => c.value === categoryFilter)?.label
+            : selectedCategory === 'all'
+              ? isMenPage
+                ? 'Men'
+                : 'New Arrivals'
+              : categories.find((c) => c.value === selectedCategory)?.label) || 'Collection'}
         </h1>
         <p className="text-base sm:text-lg text-[#5d5f5f] mt-3 md:mt-4 max-w-2xl font-light">
           {categoryFilter === 'jewellery'
             ? 'Rings, necklaces, earrings and other jewellery.'
             : categoryFilter === 'kitchen'
               ? 'Cookware, utensils and kitchen essentials.'
-            : isMenPage && selectedCategory === 'all'
-              ? 'Explore the complete ZAYRO menswear collection — tailoring, shirts, denim, and everyday essentials.'
-              : 'Discover the latest additions to our collection. Minimalist design meets premium craftsmanship.'}
+              : categoryFilter === 'home-decor'
+                ? 'Home accents, organisers and decor for every room.'
+                : categoryFilter === 'auto-electrical'
+                  ? 'Car, bike and electrical accessories.'
+                  : categoryFilter === 'accessories'
+                    ? 'Everyday accessories, gadgets and useful finds.'
+                    : categoryFilter === 'stationery-office'
+                      ? 'Stationery, desk and office essentials.'
+                      : categoryFilter === 'health-beauty'
+                        ? 'Wellness, grooming, skincare and personal care.'
+                        : isMenPage && selectedCategory === 'all'
+                          ? 'Explore the complete ZAYRO collection — clothing, jewellery, kitchen and more.'
+                          : 'Discover the latest additions to our collection. Minimalist design meets premium craftsmanship.'}
         </p>
       </div>
 
@@ -368,15 +387,57 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
         </div>
       )}
 
-      {/* Load More Button */}
-      {visibleCount < filteredProducts.length && (
-        <div className="flex justify-center mb-24">
+      {filteredProducts.length > PAGE_SIZE && (
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-24">
           <button
-            id="load-more-btn"
-            onClick={() => setVisibleCount((prev) => prev + 4)}
-            className="text-xs font-semibold uppercase tracking-[0.2em] bg-black text-white px-12 py-4 hover:bg-white hover:text-black border border-black transition-colors duration-150 cursor-pointer active:scale-95"
+            type="button"
+            disabled={currentPage <= 1}
+            onClick={() => {
+              setPage((p) => Math.max(1, p - 1));
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="text-xs font-semibold uppercase tracking-[0.15em] border border-black px-5 py-3 hover:bg-[#eeeeee] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            Load More
+            Previous
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter((n) => n === 1 || n === totalPages || Math.abs(n - currentPage) <= 1)
+            .reduce<number[]>((acc, n, idx, arr) => {
+              if (idx > 0 && n - arr[idx - 1] > 1) acc.push(-arr[idx - 1]);
+              acc.push(n);
+              return acc;
+            }, [])
+            .map((n) =>
+              n < 0 ? (
+                <span key={`e${n}`} className="px-1 text-[#5d5f5f] text-xs">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => {
+                    setPage(n);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className={`min-w-10 text-xs font-semibold uppercase tracking-[0.15em] border border-black px-3 py-3 transition-colors ${
+                    n === currentPage ? 'bg-black text-white' : 'bg-white text-black hover:bg-[#eeeeee]'
+                  }`}
+                >
+                  {n}
+                </button>
+              ),
+            )}
+          <button
+            type="button"
+            disabled={currentPage >= totalPages}
+            onClick={() => {
+              setPage((p) => Math.min(totalPages, p + 1));
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="text-xs font-semibold uppercase tracking-[0.15em] border border-black px-5 py-3 hover:bg-[#eeeeee] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Next
           </button>
         </div>
       )}

@@ -81,6 +81,8 @@ function baseRecord(input: ConfirmationCallInput, existing?: StoredOrder | null)
             productId: previous?.productId,
             designId: item.designId || previous?.designId || '',
             designName: item.designName || previous?.designName || '',
+            selectedSize: item.selectedSize || previous?.selectedSize || '',
+            customName: item.customName || previous?.customName || '',
           };
         })
       : existing?.items || [],

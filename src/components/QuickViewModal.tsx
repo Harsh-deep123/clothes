@@ -9,7 +9,7 @@ import { imagesForColor, priceForSize, productDesigns, productHasColors, product
 interface QuickViewModalProps {
   product: Product | null;
   onClose: () => void;
-  onAddToCart: (product: Product, selectedColor: string, selectedSize: string, design?: ProductDesign) => void;
+  onAddToCart: (product: Product, selectedColor: string, selectedSize: string, design?: ProductDesign, customName?: string) => void;
   onViewFullDetails: (product: Product) => void;
   isWishlisted: boolean;
   onToggleWishlist: (productId: string) => void;
@@ -29,6 +29,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
   );
   const designOptions = useMemo(() => (product ? productDesigns(product) : []), [product]);
   const [selectedDesignId, setSelectedDesignId] = useState(designOptions[0]?.id || '');
+  const [customName, setCustomName] = useState('');
   const selectedDesign = designOptions.find((design) => design.id === selectedDesignId) || designOptions[0];
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
     setSelectedColor(product.colors[0]?.name || 'Standard');
     setSelectedSize(product.sizes.find((s) => s.available)?.size || product.sizes[0]?.size || 'M');
     setSelectedDesignId(productDesigns(product)[0]?.id || '');
+    setCustomName('');
   }, [product]);
 
   if (!product) return null;
@@ -172,12 +174,31 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({
               </div>
             </div>
             )}
+            {product.namingEnabled && (
+              <div>
+                <p className="text-xs uppercase tracking-[0.15em] font-semibold text-black mb-2">Name to print</p>
+                <input
+                  type="text"
+                  value={customName}
+                  maxLength={24}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="Type the name to print on this product"
+                  className="w-full border border-[#cfc4c5] bg-white px-3 py-2.5 text-sm focus:border-black focus:outline-none"
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-3 pt-4 border-t border-[#cfc4c5]/20">
             <button
               onClick={() => {
-                onAddToCart(product, selectedDesign?.color?.trim() || selectedColor, selectedSize, selectedDesign);
+                onAddToCart(
+                  product,
+                  selectedDesign?.color?.trim() || selectedColor,
+                  selectedSize,
+                  selectedDesign,
+                  product.namingEnabled ? customName.trim() : undefined,
+                );
                 onClose();
               }}
               className="w-full py-3.5 bg-black text-white text-xs uppercase tracking-[0.2em] font-semibold hover:bg-neutral-800 transition-colors"

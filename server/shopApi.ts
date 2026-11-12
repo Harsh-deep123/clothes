@@ -177,7 +177,16 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
   }
 
   if (url === '/api/shop/products' && method === 'GET') {
-    json(res, 200, { products: await listCatalogProducts() });
+    const query = (req.url || '').includes('?') ? (req.url || '').split('?')[1] : '';
+    const params = new URLSearchParams(query);
+    const activeOnly = params.get('all') !== '1';
+    json(res, 200, { products: await listCatalogProducts({ activeOnly }) });
+    return;
+  }
+
+  if (url === '/api/shop/delivery-config' && method === 'GET') {
+    const { getDeliverySettings } = await import('./deliverySettings');
+    json(res, 200, { settings: await getDeliverySettings() });
     return;
   }
 
@@ -212,6 +221,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
           selectedColor: str(row.selectedColor) || undefined,
           designId: str(row.designId) || undefined,
           designName: str(row.designName) || undefined,
+          customName: str(row.customName) || undefined,
           quantity: Number(row.quantity) || 1,
           price: Number(row.price) || 0,
         };

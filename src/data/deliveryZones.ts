@@ -19,21 +19,21 @@ export const DELIVERY_CONFIG = {
     {
       id: 'local',
       label: 'Local delivery area',
-      charge: 30,
+      charge: 50,
       handlingCharge: 5,
       cities: ['Hoshiarpur'],
     },
     {
       id: 'nearby',
       label: 'Nearby area',
-      charge: 40,
+      charge: 50,
       handlingCharge: 8,
       states: ['Punjab'],
     },
     {
       id: 'india',
       label: 'Other supported areas',
-      charge: 60,
+      charge: 50,
       handlingCharge: 15,
       countryCodes: ['IN'],
       countryNames: ['India'],
@@ -41,7 +41,7 @@ export const DELIVERY_CONFIG = {
     {
       id: 'us',
       label: 'United States',
-      charge: 80,
+      charge: 50,
       handlingCharge: 15,
       countryCodes: ['US'],
       countryNames: ['United States'],

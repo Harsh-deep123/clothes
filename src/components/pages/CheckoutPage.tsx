@@ -90,12 +90,14 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     () =>
       items.map((item) => ({
         productId: item.productId,
+        sku: item.product.sku || '',
         name: item.product.name,
         image: itemPreviewImage(item),
         selectedSize: item.selectedSize,
         selectedColor: item.selectedColor,
         designId: item.selectedDesignId || '',
         designName: item.selectedDesignName || '',
+        customName: item.customName || '',
         quantity: item.quantity,
         price: item.price,
       })),
@@ -530,6 +532,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                         : ''}
                       {item.selectedColor}
                       {item.selectedSize !== ONE_SIZE && ` • Size ${item.selectedSize}`}
+                      {item.customName ? ` • Name ${item.customName}` : ''}
                     </p>
                     <p className="text-[#5d5f5f]">Qty: {item.quantity}</p>
                   </div>

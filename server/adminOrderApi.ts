@@ -13,6 +13,7 @@ import {
   updateDeliveryPerson,
   type DbUser,
 } from './userStore';
+import { bulkMarkupProductPrices, getDeliverySettings, saveDeliverySettings } from './deliverySettings';
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status;
@@ -308,6 +309,44 @@ export async function handleAdminOrderApi(req: IncomingMessage, res: ServerRespo
         expectedDeliveryDate: typeof payload.expectedDeliveryDate === 'string' ? str(payload.expectedDeliveryDate) : undefined,
       });
       json(res, 200, { order: updated });
+      return;
+    }
+
+    if (url === '/api/admin/delivery-charges' && method === 'GET') {
+      if (!requireAdmin(req)) {
+        json(res, 401, { error: 'Admin sign in required.' });
+        return;
+      }
+      json(res, 200, { settings: await getDeliverySettings() });
+      return;
+    }
+
+    if (url === '/api/admin/delivery-charges' && method === 'PUT') {
+      if (!requireAdmin(req)) {
+        json(res, 401, { error: 'Admin sign in required.' });
+        return;
+      }
+      const payload = JSON.parse((await readBody(req)) || '{}') as Record<string, unknown>;
+      const settings = await saveDeliverySettings({
+        unavailableMessage: typeof payload.unavailableMessage === 'string' ? payload.unavailableMessage : undefined,
+        zones: payload.zones,
+      });
+      json(res, 200, { settings });
+      return;
+    }
+
+    if (url === '/api/admin/prices/bulk-markup' && method === 'POST') {
+      if (!requireAdmin(req)) {
+        json(res, 401, { error: 'Admin sign in required.' });
+        return;
+      }
+      const payload = JSON.parse((await readBody(req)) || '{}') as Record<string, unknown>;
+      try {
+        const result = await bulkMarkupProductPrices(Number(payload.percent));
+        json(res, 200, result);
+      } catch (error) {
+        json(res, 400, { error: error instanceof Error ? error.message : 'Could not update prices.' });
+      }
       return;
     }
 

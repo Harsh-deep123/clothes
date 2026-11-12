@@ -11,11 +11,14 @@ export type StoredOrderItem = {
   quantity: number;
   price: number;
   productId?: string;
+  /** Short unique product code, e.g. ZY-000123 */
+  sku?: string;
   image?: string;
   selectedSize?: string;
   selectedColor?: string;
   designId?: string;
   designName?: string;
+  customName?: string;
 };
 
 export type StoredOrder = {
@@ -59,12 +62,14 @@ export type StoredOrder = {
   statusHistory?: Array<{ status: string; timestamp: string }>;
   products?: Array<{
     productId: string;
+    sku?: string;
     name: string;
     image?: string;
     selectedSize?: string;
     selectedColor?: string;
     designId?: string;
     designName?: string;
+    customName?: string;
     quantity: number;
     price: number;
   }>;

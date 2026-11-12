@@ -222,6 +222,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                               : ''}
                             {item.selectedColor}
                             {item.selectedSize !== ONE_SIZE && ` • Size: ${item.selectedSize}`}
+                            {item.customName ? ` • Name: ${item.customName}` : ''}
                           </p>
                           <p className="text-[#5d5f5f]">Qty: {item.quantity}</p>
                         </div>

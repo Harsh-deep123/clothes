@@ -10,8 +10,8 @@ import { AmazonLensZoom } from './ImageLightbox';
 
 interface ProductDetailScreenProps {
   product: Product;
-  onAddToCart: (product: Product, selectedColor: string, selectedSize: string, design?: ProductDesign) => void;
-  onBuyNow: (product: Product, selectedColor: string, selectedSize: string, design?: ProductDesign) => void;
+  onAddToCart: (product: Product, selectedColor: string, selectedSize: string, design?: ProductDesign, customName?: string) => void;
+  onBuyNow: (product: Product, selectedColor: string, selectedSize: string, design?: ProductDesign, customName?: string) => void;
   onSelectProduct: (product: Product) => void;
   isWishlisted: boolean;
   onToggleWishlist: (productId: string) => void;
@@ -33,6 +33,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
   const [selectedSize, setSelectedSize] = useState<string>(
     product.sizes.find((s) => s.available)?.size || product.sizes[0]?.size || 'M'
   );
+  const [customName, setCustomName] = useState('');
   const designOptions = useMemo(() => productDesigns(product), [product]);
   const [selectedDesignId, setSelectedDesignId] = useState<string>(designOptions[0]?.id || '');
   const selectedDesign = designOptions.find((design) => design.id === selectedDesignId) || designOptions[0];
@@ -81,6 +82,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
 
   useEffect(() => {
     setSelectedDesignId(productDesigns(product)[0]?.id || '');
+    setCustomName('');
   }, [product.id]);
 
   useEffect(() => {
@@ -268,6 +270,22 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
           </div>
           )}
 
+          {product.namingEnabled && (
+            <div className="mb-8">
+              <p className="text-xs uppercase tracking-[0.15em] font-semibold text-black mb-3">
+                Name to print
+              </p>
+              <input
+                type="text"
+                value={customName}
+                maxLength={24}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="Type the name to print on this product"
+                className="w-full border border-[#cfc4c5] bg-white px-4 py-3 text-sm focus:border-black focus:outline-none"
+              />
+            </div>
+          )}
+
           {/* Actions: Add to Bag & Buy Now */}
           <div className="flex flex-col gap-3 mb-10">
             {selectedDesign && (
@@ -283,7 +301,15 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
             <button
               id="add-to-bag-btn"
               disabled={outOfStock}
-              onClick={() => onAddToCart(product, purchaseColor, selectedSize, selectedDesign)}
+              onClick={() =>
+                onAddToCart(
+                  product,
+                  purchaseColor,
+                  selectedSize,
+                  selectedDesign,
+                  product.namingEnabled ? customName.trim() : undefined,
+                )
+              }
               className="w-full py-4 bg-black text-white text-xs uppercase tracking-[0.2em] font-semibold hover:bg-neutral-800 transition-colors cursor-pointer active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Add to Bag
@@ -292,7 +318,15 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               <button
                 id="buy-now-btn"
                 disabled={outOfStock}
-                onClick={() => onBuyNow(product, purchaseColor, selectedSize, selectedDesign)}
+                onClick={() =>
+                  onBuyNow(
+                    product,
+                    purchaseColor,
+                    selectedSize,
+                    selectedDesign,
+                    product.namingEnabled ? customName.trim() : undefined,
+                  )
+                }
                 className="flex-1 py-4 border border-black text-black bg-transparent text-xs uppercase tracking-[0.2em] font-semibold hover:bg-[#eeeeee] transition-colors cursor-pointer active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Buy Now

@@ -98,6 +98,7 @@ const emptyProduct = (): AdminProduct => ({
   returnPolicy: 'return_and_replace',
   hasSizes: true,
   hasColors: true,
+  namingEnabled: false,
   purchasedFrom: '',
   designs: [],
 });
@@ -267,6 +268,7 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
       sizes: sizes.length ? sizes.map((s) => ({ ...s, size: s.size.trim() })) : form.sizes,
       hasSizes: showSizes,
       hasColors: showColors,
+      namingEnabled: Boolean(form.namingEnabled),
       designs,
       purchasedFrom: form.purchasedFrom?.trim() || '',
       detailsAndCare: form.detailsAndCare.filter(Boolean),
@@ -306,6 +308,13 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
           <span className="text-sm">Name</span>
           <input value={form.name} onChange={(e) => update({ name: e.target.value })} className={fieldClass} />
         </label>
+        {form.sku ? (
+          <label className="block md:col-span-2">
+            <span className="text-sm">Product ID</span>
+            <input value={form.sku} readOnly className={`${fieldClass} bg-slate-50 text-slate-700`} />
+            <span className="mt-1 block text-xs text-slate-400">Unique ID — shows on every order so you know which product was bought.</span>
+          </label>
+        ) : null}
         <label className="block">
           <span className="text-sm">Subtitle</span>
           <input value={form.subtitle || ''} onChange={(e) => update({ subtitle: e.target.value })} className={fieldClass} />
@@ -734,6 +743,36 @@ export const AdminProductForm: React.FC<AdminProductFormProps> = ({
         ))}
         {!(form.designs || []).length && (
           <p className="text-xs text-slate-400">No extra designs. Customers will order this product as a single look.</p>
+        )}
+      </section>
+
+      <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Naming text box</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              {form.namingEnabled
+                ? 'Customers will see a text box on this product to type a name to print on it.'
+                : 'Turn this on only if this product can have a name printed on it.'}
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={Boolean(form.namingEnabled)}
+              onChange={(e) => update({ namingEnabled: e.target.checked })}
+            />
+            Show naming text box
+          </label>
+        </div>
+        {form.namingEnabled && (
+          <input
+            type="text"
+            readOnly
+            tabIndex={-1}
+            placeholder="Name to print"
+            className={`${fieldClass} max-w-sm bg-slate-50 text-slate-400`}
+          />
         )}
       </section>
 

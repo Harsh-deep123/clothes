@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ClipboardList, LayoutDashboard, Package, Tags, LogOut, ExternalLink, Menu, X, Undo2, Star } from 'lucide-react';
+import { ClipboardList, LayoutDashboard, Package, Tags, LogOut, ExternalLink, Menu, X, Undo2, Star, CircleDollarSign } from 'lucide-react';
 import { logoutAdmin } from '../adminAuth';
 
-export type AdminNav = 'dashboard' | 'products' | 'categories' | 'returns' | 'orders' | 'reviews';
+export type AdminNav = 'dashboard' | 'products' | 'categories' | 'returns' | 'orders' | 'reviews' | 'pricing';
 
 interface AdminLayoutProps {
   page: AdminNav;
@@ -20,6 +20,7 @@ const NAV = [
   { id: 'returns' as const, label: 'Returns', icon: Undo2 },
   { id: 'orders' as const, label: 'Orders', icon: ClipboardList },
   { id: 'reviews' as const, label: 'Product Reviews', icon: Star },
+  { id: 'pricing' as const, label: 'Pricing & Delivery', icon: CircleDollarSign },
 ];
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({

@@ -128,6 +128,9 @@ export const ShoppingBagDrawer: React.FC<ShoppingBagDrawerProps> = ({
                       </span>
                     </div>
                     )}
+                    {item.customName && (
+                      <p className="text-sm text-[#5d5f5f] mb-3">Name: {item.customName}</p>
+                    )}
                   </div>
 
                   <div className="flex justify-between items-center pt-2">

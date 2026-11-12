@@ -44,9 +44,10 @@ export type DeliverySlipOrder = {
     postalCode?: string;
     country?: string;
   };
-  items?: Array<{ name: string; quantity: number; price: number }>;
+  items?: Array<{ name: string; quantity: number; price: number; sku?: string; productId?: string }>;
   products?: Array<{
     productId?: string;
+    sku?: string;
     name?: string;
     quantity?: number;
     price?: number;
@@ -54,6 +55,7 @@ export type DeliverySlipOrder = {
     selectedColor?: string;
     designId?: string;
     designName?: string;
+    customName?: string;
   }>;
   total: number;
   paymentMethod?: string;
@@ -125,10 +127,19 @@ type SlipLine = { name: string; sku: string; qty: number; unit: number };
 function slipLines(order: DeliverySlipOrder): SlipLine[] {
   if (order.products?.length) {
     return order.products.map((product) => {
-      const skuParts = [product.productId, product.designId, product.selectedSize, product.selectedColor].filter(Boolean);
+      const skuParts = [product.sku || product.productId, product.designId, product.selectedSize, product.selectedColor].filter(Boolean);
       return {
-        name: [product.name || 'Item', product.designName].filter(Boolean).join(' — '),
-        sku: skuParts.join('-').toUpperCase(),
+        name: [
+          product.name || 'Item',
+          product.designName,
+          product.selectedSize && !/^one[\s-]?size$/i.test(product.selectedSize)
+            ? `Size ${product.selectedSize}`
+            : '',
+          product.customName ? `Name ${product.customName}` : '',
+        ]
+          .filter(Boolean)
+          .join(' — '),
+        sku: (product.sku || skuParts.join('-')).toUpperCase(),
         qty: Number(product.quantity) || 1,
         unit: Number(product.price) || 0,
       };
@@ -136,7 +147,7 @@ function slipLines(order: DeliverySlipOrder): SlipLine[] {
   }
   return (order.items || []).map((item) => ({
     name: item.name,
-    sku: '',
+    sku: String(item.sku || item.productId || '').toUpperCase(),
     qty: Number(item.quantity) || 1,
     unit: Number(item.price) || 0,
   }));

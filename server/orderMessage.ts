@@ -4,12 +4,30 @@ export type OrderLineItem = {
   price: number;
   designId?: string;
   designName?: string;
+  selectedSize?: string;
+  customName?: string;
 };
+
+export function selectedSizeLabel(size?: string | null) {
+  const value = (size || '').trim();
+  if (!value || /^one[\s-]?size$/i.test(value)) return '';
+  return value;
+}
 
 function designLine(item: OrderLineItem) {
   if (!item.designName && !item.designId) return '';
   const name = item.designName || 'Selected design';
   return item.designId ? `\nDesign: ${name} (${item.designId})` : `\nDesign: ${name}`;
+}
+
+function sizeLine(item: OrderLineItem) {
+  const size = selectedSizeLabel(item.selectedSize);
+  return size ? `\nSize: ${size}` : '';
+}
+
+function nameLine(item: OrderLineItem) {
+  const name = (item.customName || '').trim();
+  return name ? `\nName: ${name}` : '';
 }
 
 export function formatInr(value: number) {
@@ -43,7 +61,7 @@ export function formatWhatsAppOrderMessage(input: {
   const products = (input.items.length ? input.items : [{ name: 'Your items', quantity: 1, price: input.total }])
     .map(
       (item) =>
-        `Product Name: ${item.name}${designLine(item)}\nQuantity: ${item.quantity}\nPrice: ${formatInr(item.price)}`
+        `Product Name: ${item.name}${designLine(item)}${sizeLine(item)}${nameLine(item)}\nQuantity: ${item.quantity}\nPrice: ${formatInr(item.price)}`
     )
     .join('\n\n');
 
@@ -81,7 +99,11 @@ export function spokenOrderScript(input: {
   const products = (input.items.length ? input.items : []).map((item) => {
     const line = (Number(item.price) || 0) * (Number(item.quantity) || 1);
     const design = item.designName ? `, design ${item.designName}` : '';
-    return `${item.name}${design}, quantity ${item.quantity}, price ${line.toLocaleString('en-IN')} rupees`;
+    const size = selectedSizeLabel(item.selectedSize);
+    const sizeSpeech = size ? `, size ${size}` : '';
+    const printed = (item.customName || '').trim();
+    const nameSpeech = printed ? `, name ${printed}` : '';
+    return `${item.name}${design}${sizeSpeech}${nameSpeech}, quantity ${item.quantity}, price ${line.toLocaleString('en-IN')} rupees`;
   });
   const productSpeech = products.length
     ? ` You ordered: ${products.join('. ')}.`

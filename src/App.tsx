@@ -18,7 +18,7 @@ import { SearchOverlay, searchProducts } from './components/SearchOverlay';
 import { LoginModal } from './components/LoginModal';
 import { LocationWelcomeModal, DELIVERY_LOCATION_KEY, deliveryCityLabel, readSavedDeliveryLocation, SavedDeliveryLocation } from './components/LocationWelcomeModal';
 import { deliveryLocationFromIpinfo, fetchIpinfoLite, mergeLocationWithIpinfo, type IpinfoLite } from './lib/ipinfo';
-import { getDeliveryQuote } from './lib/delivery';
+import { getDeliveryQuote, hydrateDeliveryConfigFromServer } from './lib/delivery';
 import { loadReviewSummaries } from './lib/reviewsApi';
 import { useScrollReveal } from './hooks/useScrollReveal';
 import {
@@ -128,14 +128,19 @@ export default function App() {
     null
   );
 
+  const [deliveryConfigTick, setDeliveryConfigTick] = useState(0);
   const signedIn = Boolean(sessionEmail && account && account.email === sessionEmail);
   const deliveryQuote = useMemo(
     () => getDeliveryQuote(deliveryLocation, ipinfo),
-    [deliveryLocation, ipinfo]
+    [deliveryLocation, ipinfo, deliveryConfigTick]
   );
 
   useEffect(() => {
     void loadReviewSummaries();
+  }, []);
+
+  useEffect(() => {
+    void hydrateDeliveryConfigFromServer().then(() => setDeliveryConfigTick((n) => n + 1));
   }, []);
 
   useEffect(() => {
@@ -305,16 +310,19 @@ export default function App() {
     selectedColor: string,
     selectedSize: string,
     design?: ProductDesign,
+    customName?: string,
   ) => {
     const selectedDesignId = design?.id || '';
     const selectedDesignName = design?.name || '';
+    const printedName = customName?.trim() || '';
     setCartItems((prev) => {
       const existing = prev.find(
         (item) =>
           item.productId === product.id &&
           item.selectedColor === selectedColor &&
           item.selectedSize === selectedSize &&
-          (item.selectedDesignId || '') === selectedDesignId
+          (item.selectedDesignId || '') === selectedDesignId &&
+          (item.customName || '') === printedName
       );
       if (existing) {
         return prev.map((item) =>
@@ -329,6 +337,7 @@ export default function App() {
           selectedSize,
           selectedDesignId: selectedDesignId || undefined,
           selectedDesignName: selectedDesignName || undefined,
+          customName: printedName || undefined,
           quantity: 1,
           price: priceForSize(product, selectedSize).price,
         };
@@ -499,12 +508,14 @@ export default function App() {
         shippingAddress: details.shippingAddress,
         items: cartItems.map((item) => ({
           productId: item.productId,
+          sku: item.product.sku || '',
           name: item.product.name,
           image: itemPreviewImage(item),
           selectedSize: item.selectedSize,
           selectedColor: item.selectedColor,
           designId: item.selectedDesignId || '',
           designName: item.selectedDesignName || '',
+          customName: item.customName || '',
           quantity: item.quantity,
           price: item.price,
         })),
@@ -706,8 +717,8 @@ export default function App() {
           <ProductDetailScreen
             product={selectedProduct}
             onAddToCart={handleAddToCart}
-            onBuyNow={(p, c, s, design) => {
-              handleAddToCart(p, c, s, design);
+            onBuyNow={(p, c, s, design, customName) => {
+              handleAddToCart(p, c, s, design, customName);
               requestCheckout();
             }}
             onSelectProduct={handleSelectProduct}
