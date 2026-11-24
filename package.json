@@ -6,7 +6,8 @@
   "scripts": {
     "predev": "node scripts/ensure-mongodb.mjs",
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build && node scripts/bundle-vercel-api.mjs",
+    "export:catalog": "node scripts/export-storefront-catalog.mjs",
+    "build": "node scripts/export-storefront-catalog.mjs && vite build && node scripts/bundle-vercel-api.mjs",
     "build:api": "node scripts/bundle-vercel-api.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",

@@ -227,6 +227,10 @@ function toLiteProduct(row: Record<string, unknown>) {
 export async function listCatalogProducts(options?: ListCatalogOptions) {
   const db = await getDb();
   if (!db) {
+    const { fallbackCatalogAvailable, listFallbackCatalogProducts } = await import('./catalogFallback');
+    if (fallbackCatalogAvailable()) {
+      return listFallbackCatalogProducts(options);
+    }
     const err = new Error('Database is unavailable.');
     (err as Error & { status?: number }).status = 503;
     throw err;
@@ -259,7 +263,10 @@ export async function listCatalogProducts(options?: ListCatalogOptions) {
 
 export async function getCatalogProductById(id: string) {
   const db = await getDb();
-  if (!db) return null;
+  if (!db) {
+    const { getFallbackCatalogProductById } = await import('./catalogFallback');
+    return getFallbackCatalogProductById(id);
+  }
   const productId = id.trim();
   if (!productId) return null;
   const doc = await db.collection('products').findOne(

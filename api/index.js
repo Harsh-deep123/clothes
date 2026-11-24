@@ -1249,6 +1249,95 @@ var init_orderStore = __esm({
   }
 });
 
+// server/catalogFallback.ts
+var catalogFallback_exports = {};
+__export(catalogFallback_exports, {
+  fallbackCatalogAvailable: () => fallbackCatalogAvailable,
+  getFallbackCatalogProductById: () => getFallbackCatalogProductById,
+  listFallbackCatalogProducts: () => listFallbackCatalogProducts
+});
+function dataDirs() {
+  return [import_path4.default.join(process.cwd(), "server", "data"), import_path4.default.join(process.cwd(), "data")];
+}
+function resolveDataFile(...parts) {
+  for (const dir of dataDirs()) {
+    const full = import_path4.default.join(dir, ...parts);
+    if ((0, import_fs.existsSync)(full)) return full;
+  }
+  return null;
+}
+function readJsonFile2(filePath) {
+  if (!filePath) return null;
+  try {
+    return JSON.parse((0, import_fs.readFileSync)(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+function loadAllProducts() {
+  if (cachedAll) return cachedAll;
+  const file = readJsonFile2(resolveDataFile("catalog-lite.json"));
+  cachedAll = Array.isArray(file?.products) ? file.products.filter((p) => typeof p?.id === "string") : [];
+  return cachedAll;
+}
+function matchesCategory(product, category) {
+  const slug = (category || "").trim();
+  if (!slug || slug === "all") return true;
+  const value = typeof product.category === "string" ? product.category : "";
+  if (slug === "sale") {
+    return Boolean(product.isSale) || Boolean(product.saleEnabled) || Number(product.price) <= 12499;
+  }
+  if (slug === "women") return /^women($|-)/i.test(value);
+  if (slug === "health-beauty") return /^(health-beauty|beauty-)/i.test(value);
+  return value === slug;
+}
+function loadCategoryProducts(category) {
+  const slug = (category || "").trim();
+  if (!slug || slug === "all") return loadAllProducts();
+  if (cachedCategory.has(slug)) return cachedCategory.get(slug);
+  const fileName = slug === "women" ? "_women.json" : slug === "health-beauty" ? "_health-beauty.json" : `${slug.replace(/[^a-zA-Z0-9._-]+/g, "_")}.json`;
+  const file = readJsonFile2(resolveDataFile("catalog", fileName));
+  let rows = Array.isArray(file?.products) ? file.products.filter((p) => typeof p?.id === "string") : null;
+  if (!rows) {
+    rows = loadAllProducts().filter((p) => matchesCategory(p, slug));
+  }
+  cachedCategory.set(slug, rows);
+  return rows;
+}
+function fallbackCatalogAvailable() {
+  return Boolean(resolveDataFile("catalog-lite.json"));
+}
+function listFallbackCatalogProducts(options) {
+  const page = Math.max(1, Number(options?.page) || 1);
+  const rawLimit = Number(options?.limit);
+  const unlimited = !Number.isFinite(rawLimit) || rawLimit <= 0;
+  const limit = unlimited ? 0 : Math.min(200, Math.max(1, Math.floor(rawLimit)));
+  const all = loadCategoryProducts(options?.category);
+  const total = all.length;
+  const slice = unlimited ? all : all.slice((page - 1) * limit, page * limit);
+  return {
+    products: slice,
+    total,
+    page,
+    limit: unlimited ? total : limit,
+    source: "fallback"
+  };
+}
+function getFallbackCatalogProductById(id) {
+  const productId = id.trim();
+  if (!productId) return null;
+  return loadAllProducts().find((p) => p.id === productId) || null;
+}
+var import_fs, import_path4, cachedAll, cachedCategory;
+var init_catalogFallback = __esm({
+  "server/catalogFallback.ts"() {
+    import_fs = require("fs");
+    import_path4 = __toESM(require("path"), 1);
+    cachedAll = null;
+    cachedCategory = /* @__PURE__ */ new Map();
+  }
+});
+
 // server/productSku.ts
 var productSku_exports = {};
 __export(productSku_exports, {
@@ -2328,6 +2417,10 @@ function toLiteProduct(row) {
 async function listCatalogProducts(options) {
   const db2 = await getDb();
   if (!db2) {
+    const { fallbackCatalogAvailable: fallbackCatalogAvailable2, listFallbackCatalogProducts: listFallbackCatalogProducts2 } = await Promise.resolve().then(() => (init_catalogFallback(), catalogFallback_exports));
+    if (fallbackCatalogAvailable2()) {
+      return listFallbackCatalogProducts2(options);
+    }
     const err = new Error("Database is unavailable.");
     err.status = 503;
     throw err;
@@ -2357,7 +2450,10 @@ async function listCatalogProducts(options) {
 }
 async function getCatalogProductById(id) {
   const db2 = await getDb();
-  if (!db2) return null;
+  if (!db2) {
+    const { getFallbackCatalogProductById: getFallbackCatalogProductById2 } = await Promise.resolve().then(() => (init_catalogFallback(), catalogFallback_exports));
+    return getFallbackCatalogProductById2(id);
+  }
   const productId = id.trim();
   if (!productId) return null;
   const doc = await db2.collection("products").findOne(
@@ -3790,9 +3886,9 @@ async function notifyAdmin(request) {
 
 // server/returnRequestStore.ts
 var import_promises4 = __toESM(require("fs/promises"), 1);
-var import_path4 = __toESM(require("path"), 1);
+var import_path5 = __toESM(require("path"), 1);
 init_mongoCollections();
-var STORE_PATH2 = import_path4.default.resolve(process.cwd(), "data", "return-requests.json");
+var STORE_PATH2 = import_path5.default.resolve(process.cwd(), "data", "return-requests.json");
 var migrated2 = false;
 async function ensureMigrated2() {
   if (migrated2) return;
@@ -3800,7 +3896,7 @@ async function ensureMigrated2() {
   migrated2 = true;
 }
 async function ensureFileStore2() {
-  await import_promises4.default.mkdir(import_path4.default.dirname(STORE_PATH2), { recursive: true });
+  await import_promises4.default.mkdir(import_path5.default.dirname(STORE_PATH2), { recursive: true });
   try {
     await import_promises4.default.access(STORE_PATH2);
   } catch {

@@ -315,6 +315,7 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
           <h3 className="font-serif-luxury text-2xl text-black mb-3">Could not load products</h3>
           <p className="text-sm text-[#5d5f5f] mb-6">{loadError}</p>
           <button
+            type="button"
             onClick={() => setReloadToken((n) => n + 1)}
             className="bg-black text-white px-6 py-3 text-xs uppercase tracking-[0.2em] font-semibold"
           >
@@ -325,9 +326,12 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
         <div className="py-24 text-center">
           <h3 className="font-serif-luxury text-2xl text-black mb-3">No Products Found</h3>
           <p className="text-sm text-[#5d5f5f] mb-6">
-            Try adjusting your active filters to view more items.
+            {totalCount === 0
+              ? 'Products are not available from the server right now. Please try again shortly.'
+              : 'Try adjusting your active filters to view more items.'}
           </p>
           <button
+            type="button"
             onClick={resetFilters}
             className="bg-black text-white px-6 py-3 text-xs uppercase tracking-[0.2em] font-semibold"
           >
