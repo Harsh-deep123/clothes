@@ -167,7 +167,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="hidden md:block">
             <LanguageSelector />
           </div>
-          <ThemeToggle />
+          <div className="hidden md:block">
+            <ThemeToggle />
+          </div>
           <button
             type="button"
             aria-label={t('nav.search')}
