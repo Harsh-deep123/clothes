@@ -33,7 +33,7 @@ export function useAdminCatalog(): AdminProduct[] {
   const [products, setProducts] = useState<AdminProduct[]>(() => getCatalog());
   useEffect(() => {
     const unsub = subscribeCatalog(() => setProducts(getCatalog()));
-    void hydrateCatalogFromServer().catch(() => undefined);
+    void hydrateCatalogFromServer({ full: true }).catch(() => undefined);
     return unsub;
   }, []);
   return products;

@@ -215,13 +215,16 @@ header {
 }
 
 @supports (animation-timeline: view()) {
-  .zayro-page section:not(.zayro-hero),
-  .zayro-page article,
-  footer > div,
-  .zayro-reveal {
-    animation: rise-in linear both;
-    animation-timeline: view();
-    animation-range: entry 0% cover 28%;
+  /* Desktop only — mobile view-timeline often leaves sections stuck at opacity 0 */
+  @media (min-width: 768px) and (hover: hover) {
+    .zayro-page section:not(.zayro-hero),
+    .zayro-page article,
+    footer > div,
+    .zayro-reveal {
+      animation: rise-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 28%;
+    }
   }
 }
 
@@ -616,7 +619,7 @@ textarea::placeholder {
 /* Support chat (Origin-style messaging panel) */
 .zayro-support-panel {
   animation: scale-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
-  transform-origin: bottom left;
+  transform-origin: bottom right;
 }
 #zayro-support-chat-btn {
   transition: transform 0.25s ease, background-color 0.25s ease, box-shadow 0.25s ease;

@@ -32,7 +32,15 @@ import {
   setAuthToken,
   toLocalAccount,
 } from './lib/shopApi';
-import { getStorefrontProduct, getStorefrontProducts, itemPreviewImage, priceForSize, productDesigns } from './catalog';
+import {
+  fetchStorefrontProductById,
+  getStorefrontProduct,
+  getStorefrontProducts,
+  itemPreviewImage,
+  priceForSize,
+  productDesigns,
+  toStorefrontProduct,
+} from './catalog';
 import { useCatalogTick } from './hooks/useCatalog';
 import {
   AccountTab,
@@ -219,6 +227,13 @@ export default function App() {
     if (route.productId) {
       const product = getStorefrontProduct(route.productId);
       if (product) setSelectedProduct(product);
+      else {
+        void fetchStorefrontProductById(route.productId)
+          .then((remote) => {
+            if (remote) setSelectedProduct(toStorefrontProduct(remote));
+          })
+          .catch(() => undefined);
+      }
     }
   };
 
@@ -303,6 +318,11 @@ export default function App() {
     setCurrentScreen('product-detail');
     setIsSearchOpen(false);
     pushAppUrl({ screen: 'product-detail', productId: product.id });
+    void fetchStorefrontProductById(product.id)
+      .then((remote) => {
+        if (remote) setSelectedProduct(toStorefrontProduct(remote));
+      })
+      .catch(() => undefined);
   };
 
   const handleAddToCart = (

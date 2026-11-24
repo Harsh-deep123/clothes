@@ -148,20 +148,122 @@ async function keepImage(value: unknown) {
   return source;
 }
 
-export async function listCatalogProducts(options?: { activeOnly?: boolean }) {
+export type ListCatalogOptions = {
+  activeOnly?: boolean;
+  category?: string;
+  page?: number;
+  limit?: number;
+  lite?: boolean;
+};
+
+function buildCategoryFilter(category?: string): Record<string, unknown> {
+  const slug = (category || '').trim();
+  if (!slug || slug === 'all') return {};
+  if (slug === 'sale') {
+    return {
+      $or: [{ isSale: true }, { saleEnabled: true }, { price: { $lte: 12499 } }],
+    };
+  }
+  if (slug === 'women') {
+    return { category: { $regex: /^women($|-)/i } };
+  }
+  if (slug === 'health-beauty') {
+    return { category: { $regex: /^(health-beauty|beauty-)/i } };
+  }
+  return { category: slug };
+}
+
+function toLiteProduct(row: Record<string, unknown>) {
+  const images = Array.isArray(row.images)
+    ? row.images.filter((url): url is string => typeof url === 'string' && Boolean(url)).slice(0, 2)
+    : [];
+  const colors = Array.isArray(row.colors)
+    ? row.colors.slice(0, 8).map((color) => {
+        if (!color || typeof color !== 'object') return color;
+        const entry = color as Record<string, unknown>;
+        const colorImages = Array.isArray(entry.images)
+          ? entry.images.filter((url): url is string => typeof url === 'string' && Boolean(url)).slice(0, 1)
+          : [];
+        return {
+          name: entry.name,
+          value: entry.value,
+          images: colorImages,
+        };
+      })
+    : row.colors;
+  return {
+    id: row.id,
+    sku: row.sku,
+    name: row.name,
+    subtitle: row.subtitle,
+    price: row.price,
+    listPrice: row.listPrice,
+    originalPrice: row.originalPrice,
+    category: row.category,
+    categoryLabel: row.categoryLabel,
+    breadcrumb: row.breadcrumb,
+    images,
+    colors,
+    sizes: row.sizes,
+    designs: Array.isArray(row.designs) ? row.designs.slice(0, 4) : row.designs,
+    description: typeof row.description === 'string' ? row.description.slice(0, 280) : row.description,
+    detailsAndCare: Array.isArray(row.detailsAndCare) ? row.detailsAndCare.slice(0, 4) : [],
+    shippingAndReturns: typeof row.shippingAndReturns === 'string' ? row.shippingAndReturns.slice(0, 160) : '',
+    isNew: row.isNew,
+    isSale: row.isSale,
+    stock: row.stock,
+    active: row.active,
+    hasSizes: row.hasSizes,
+    hasColors: row.hasColors,
+    discountEnabled: row.discountEnabled,
+    discountType: row.discountType,
+    discountValue: row.discountValue,
+    saleEnabled: row.saleEnabled,
+    saleStart: row.saleStart,
+    saleEnd: row.saleEnd,
+  };
+}
+
+export async function listCatalogProducts(options?: ListCatalogOptions) {
   const db = await getDb();
-  if (!db) return [];
-  const filter = options?.activeOnly ? { active: { $ne: false } } : {};
-  const docs = await db
-    .collection('products')
-    .find(filter)
-    .project({
-      _id: 0,
-      averageRating: 0,
-      totalReviews: 0,
-    })
-    .toArray();
-  return docs.filter((row) => typeof row.id === 'string' && Boolean(row.id.trim()));
+  if (!db) return { products: [] as Record<string, unknown>[], total: 0, page: 1, limit: 0 };
+  const filter: Record<string, unknown> = {
+    ...(options?.activeOnly ? { active: { $ne: false } } : {}),
+    ...buildCategoryFilter(options?.category),
+  };
+  const page = Math.max(1, Number(options?.page) || 1);
+  const rawLimit = Number(options?.limit);
+  const unlimited = !Number.isFinite(rawLimit) || rawLimit <= 0;
+  const limit = unlimited ? 0 : Math.min(200, Math.max(1, Math.floor(rawLimit)));
+  const collection = db.collection('products');
+  const total = await collection.countDocuments(filter);
+  let cursor = collection.find(filter).project({
+    _id: 0,
+    averageRating: 0,
+    totalReviews: 0,
+    purchasedFrom: 0,
+  });
+  if (!unlimited) {
+    cursor = cursor.skip((page - 1) * limit).limit(limit);
+  }
+  const docs = await cursor.toArray();
+  const products = docs
+    .filter((row) => typeof row.id === 'string' && Boolean(row.id.trim()))
+    .map((row) => (options?.lite ? toLiteProduct(row as Record<string, unknown>) : row));
+  return { products, total, page, limit: unlimited ? total : limit };
+}
+
+export async function getCatalogProductById(id: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const productId = id.trim();
+  if (!productId) return null;
+  const doc = await db.collection('products').findOne(
+    { id: productId },
+    { projection: { _id: 0, averageRating: 0, totalReviews: 0, purchasedFrom: 0 } },
+  );
+  if (!doc || typeof doc.id !== 'string') return null;
+  return doc;
 }
 
 export async function deleteCatalogProduct(id: string) {

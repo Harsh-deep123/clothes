@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import { bearerToken, signAuthToken, verifyAuthToken } from './jwt';
 import { seedProductsCollection, createShopOrder, getOrderByOrderId, listOrdersForUser, normalizeDeliveryLocation } from './shopOrders';
-import { listCatalogProducts } from './productImages';
+import { getCatalogProductById, listCatalogProducts } from './productImages';
 import { sendRegistrationOtp, verifyRegistrationOtp } from './otpStore';
 import { createUser, findUserById, updateUserProfile, verifyUser } from './userStore';
 
@@ -176,11 +176,35 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     return;
   }
 
+  if (url.startsWith('/api/shop/products/') && method === 'GET') {
+    const productId = decodeURIComponent(url.slice('/api/shop/products/'.length).split('?')[0] || '');
+    const product = await getCatalogProductById(productId);
+    if (!product) {
+      json(res, 404, { error: 'Product not found.' });
+      return;
+    }
+    json(res, 200, { product });
+    return;
+  }
+
   if (url === '/api/shop/products' && method === 'GET') {
     const query = (req.url || '').includes('?') ? (req.url || '').split('?')[1] : '';
     const params = new URLSearchParams(query);
     const activeOnly = params.get('all') !== '1';
-    json(res, 200, { products: await listCatalogProducts({ activeOnly }) });
+    const lite = params.get('lite') === '1';
+    const full = params.get('full') === '1';
+    const category = params.get('category') || undefined;
+    const page = Number(params.get('page') || 1) || 1;
+    const hasLimit = params.has('limit');
+    const limit = full && !hasLimit ? 0 : Number(params.get('limit') || (lite ? 48 : 96));
+    const result = await listCatalogProducts({
+      activeOnly,
+      category,
+      page,
+      limit: Number.isFinite(limit) ? limit : 96,
+      lite: lite || !full,
+    });
+    json(res, 200, result);
     return;
   }
 

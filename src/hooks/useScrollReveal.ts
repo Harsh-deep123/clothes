@@ -4,7 +4,10 @@ import { useEffect } from 'react';
 export function useScrollReveal(selector = '.zayro-reveal') {
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (CSS.supports?.('animation-timeline', 'view()')) return;
+    const desktopViewTimeline =
+      CSS.supports?.('animation-timeline', 'view()') &&
+      window.matchMedia('(min-width: 768px) and (hover: hover)').matches;
+    if (desktopViewTimeline) return;
 
     const nodes = Array.from(document.querySelectorAll<HTMLElement>(selector));
     if (!nodes.length) return;

@@ -347,30 +347,102 @@ export function saveCatalog(next: AdminProduct[]) {
 
 let hydrateInFlight: Promise<AdminProduct[]> | null = null;
 
-export async function hydrateCatalogFromServer(): Promise<AdminProduct[]> {
+export type StorefrontCatalogQuery = {
+  category?: string | null;
+  page?: number;
+  limit?: number;
+  full?: boolean;
+};
+
+export function mergeCatalogProducts(products: AdminProduct[]) {
+  if (!products.length) return;
+  const byId = new Map(catalog.map((item) => [item.id, item]));
+  products.forEach((item) => {
+    if (!item.id) return;
+    byId.set(item.id, { ...item });
+  });
+  catalog = Array.from(byId.values());
+  notify();
+}
+
+export async function fetchStorefrontCatalogPage(
+  query: StorefrontCatalogQuery = {},
+): Promise<{ products: AdminProduct[]; total: number; page: number; limit: number }> {
+  const params = new URLSearchParams();
+  params.set('lite', query.full ? '0' : '1');
+  if (query.full) params.set('full', '1');
+  params.set('page', String(Math.max(1, query.page || 1)));
+  params.set('limit', String(Math.min(200, Math.max(1, query.limit || 48))));
+  if (query.category && query.category !== 'all') params.set('category', query.category);
+  const response = await fetch(`/api/shop/products?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  });
+  const data = (await response.json().catch(() => ({}))) as {
+    products?: unknown;
+    total?: number;
+    page?: number;
+    limit?: number;
+    error?: string;
+  };
+  if (!response.ok) throw new Error(data.error || 'Could not load products.');
+  const remote = Array.isArray(data.products)
+    ? data.products
+        .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+        .map((item, index) => normalizeAdminProduct(item as Partial<AdminProduct>, index))
+        .filter((item) => item.id)
+    : [];
+  mergeCatalogProducts(remote);
+  return {
+    products: remote,
+    total: Number(data.total) || remote.length,
+    page: Number(data.page) || 1,
+    limit: Number(data.limit) || remote.length,
+  };
+}
+
+export async function fetchStorefrontProductById(id: string): Promise<AdminProduct | undefined> {
+  const productId = id.trim();
+  if (!productId) return undefined;
+  const response = await fetch(`/api/shop/products/${encodeURIComponent(productId)}`, {
+    headers: { Accept: 'application/json' },
+  });
+  const data = (await response.json().catch(() => ({}))) as { product?: unknown; error?: string };
+  if (!response.ok) throw new Error(data.error || 'Could not load product.');
+  if (!data.product || typeof data.product !== 'object') return undefined;
+  const product = normalizeAdminProduct(data.product as Partial<AdminProduct>);
+  mergeCatalogProducts([product]);
+  return product;
+}
+
+export async function hydrateCatalogFromServer(options?: {
+  full?: boolean;
+}): Promise<AdminProduct[]> {
   if (hydrateInFlight) return hydrateInFlight;
   hydrateInFlight = (async () => {
-    const response = await fetch('/api/shop/products', { headers: { Accept: 'application/json' } });
-    const data = (await response.json().catch(() => ({}))) as { products?: unknown; error?: string };
-    if (!response.ok) throw new Error(data.error || 'Could not load products.');
-    const remote = Array.isArray(data.products)
-      ? data.products
-          .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
-          .map((item, index) => normalizeAdminProduct(item as Partial<AdminProduct>, index))
-          .filter((item) => item.id)
-      : [];
-    if (!remote.length) return [];
-    const remoteIds = new Set(remote.map((item) => item.id));
-    const seedIds = new Set(PRODUCTS.map((item) => item.id));
-    const extras = catalog.filter((item) => item.id && !remoteIds.has(item.id) && !seedIds.has(item.id));
-    // Large server catalogs (e.g. DeoDap import) must not be written to localStorage.
-    if (remote.length > 400) {
+    if (options?.full) {
+      const response = await fetch('/api/shop/products?full=1&limit=0', {
+        headers: { Accept: 'application/json' },
+      });
+      const data = (await response.json().catch(() => ({}))) as { products?: unknown; error?: string };
+      if (!response.ok) throw new Error(data.error || 'Could not load products.');
+      const remote = Array.isArray(data.products)
+        ? data.products
+            .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+            .map((item, index) => normalizeAdminProduct(item as Partial<AdminProduct>, index))
+            .filter((item) => item.id)
+        : [];
+      if (!remote.length) return [];
       catalog = remote;
       notify();
       return [];
     }
-    catalog = [...extras, ...remote];
-    persist();
+
+    // Mobile-safe: never pull the full 10k+ catalog into the browser.
+    const beforeIds = new Set(catalog.map((item) => item.id));
+    const { products: remote } = await fetchStorefrontCatalogPage({ page: 1, limit: 64 });
+    if (!remote.length) return [];
+    const extras = catalog.filter((item) => item.id && !beforeIds.has(item.id) && !remote.some((r) => r.id === item.id));
+    if (catalog.length <= 400) persist();
     return extras;
   })().finally(() => {
     hydrateInFlight = null;

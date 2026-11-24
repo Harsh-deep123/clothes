@@ -61,7 +61,7 @@ export const AdminPricingTools: React.FC<AdminPricingToolsProps> = ({ notify }) 
     setBumping(true);
     try {
       const result = await adminBulkMarkupPrices(value);
-      await hydrateCatalogFromServer();
+      await hydrateCatalogFromServer({ full: true });
       notify(`Updated ${result.updated} products by ${direction}.`, 'success');
     } catch (err) {
       notify(err instanceof Error ? err.message : 'Could not update prices.', 'error');

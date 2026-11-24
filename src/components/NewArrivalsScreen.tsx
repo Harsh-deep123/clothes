@@ -1,18 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { SlidersHorizontal, Heart, ChevronDown, Check, X } from 'lucide-react';
 import { Product } from '../types';
 import { ProductBadges, ProductPrice } from './ProductPrice';
 import { ProductRatingSummary } from './ProductRatingSummary';
-import { useAdminCategories, useStorefrontProducts } from '../hooks/useCatalog';
+import { useAdminCategories } from '../hooks/useCatalog';
 import { FilterSelect } from './FilterSelect';
 import {
   HEALTH_BEAUTY_SUBCATEGORIES,
-  isHealthBeautyCategory,
   STORE_SECTION_CATEGORIES,
   WOMEN_SUBCATEGORIES,
   isAddedStoreCategory,
-  isWomenCategory,
 } from '../data/products';
+import { fetchStorefrontCatalogPage, toStorefrontProduct } from '../catalog';
 
 interface NewArrivalsScreenProps {
   onSelectProduct: (product: Product) => void;
@@ -29,7 +28,6 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
   onToggleWishlist,
   categoryFilter,
 }) => {
-  const products = useStorefrontProducts();
   const adminCategories = useAdminCategories();
   const [selectedCategory, setSelectedCategory] = useState<string>(categoryFilter || 'all');
   const [selectedSize, setSelectedSize] = useState<string>('all');
@@ -38,15 +36,22 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
   const [sortBy, setSortBy] = useState<'newest' | 'price-asc' | 'price-desc' | 'popular'>('newest');
   const [showFilterDrawer, setShowFilterDrawer] = useState<boolean>(false);
   const [page, setPage] = useState(1);
+  const [pageProducts, setPageProducts] = useState<Product[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const PAGE_SIZE = 16;
 
   // Sync category filter if changed from prop
-  React.useEffect(() => {
+  useEffect(() => {
     setSelectedCategory(categoryFilter || 'all');
     setPage(1);
   }, [categoryFilter]);
 
   const isMenPage = categoryFilter === 'all';
+  const lockedCategory = categoryFilter && categoryFilter !== 'all' ? categoryFilter : null;
+  const activeCategory = lockedCategory || selectedCategory;
 
   const categories = [
     { label: 'All Categories', value: 'all' },
@@ -79,11 +84,65 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
 
   const sizes = ['all', 'S', 'M', 'L', 'XL', '30', '32', '34', '15.5', '16.0'];
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    void fetchStorefrontCatalogPage({
+      category: activeCategory === 'all' ? null : activeCategory,
+      page,
+      limit: PAGE_SIZE,
+    })
+      .then((result) => {
+        if (cancelled) return;
+        let list = result.products.map(toStorefrontProduct);
+        if (selectedSize !== 'all') {
+          list = list.filter((p) => p.sizes.some((s) => s.size === selectedSize && s.available));
+        }
+        if (selectedColor !== 'all') {
+          list = list.filter((p) => p.colors.some((c) => c.name === selectedColor));
+        }
+        if (selectedPriceRange === 'under-150') {
+          list = list.filter((p) => p.price < 12499);
+        } else if (selectedPriceRange === '150-300') {
+          list = list.filter((p) => p.price >= 12499 && p.price <= 24999);
+        } else if (selectedPriceRange === 'over-300') {
+          list = list.filter((p) => p.price > 24999);
+        }
+        if (sortBy === 'newest') {
+          list.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+        } else if (sortBy === 'price-asc') {
+          list.sort((a, b) => a.price - b.price);
+        } else if (sortBy === 'price-desc') {
+          list.sort((a, b) => b.price - a.price);
+        } else if (sortBy === 'popular') {
+          list.sort((a, b) => {
+            const score = (p: Product) => (p.isNew ? 2 : 0) + (p.isSale ? 1 : 0);
+            return score(b) - score(a);
+          });
+        }
+        setPageProducts(list);
+        setTotalCount(result.total);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPageProducts([]);
+        setTotalCount(0);
+        setLoadError(err instanceof Error ? err.message : 'Could not load products.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCategory, page, selectedSize, selectedColor, selectedPriceRange, sortBy, reloadToken]);
+
   const colors = useMemo(() => {
     const names = new Set<string>();
-    products.forEach((p) => p.colors.forEach((c) => names.add(c.name)));
+    pageProducts.forEach((p) => p.colors.forEach((c) => names.add(c.name)));
     return Array.from(names);
-  }, [products]);
+  }, [pageProducts]);
 
   const priceRanges = [
     { label: 'All Prices', value: 'all' },
@@ -91,60 +150,6 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     { label: '₹12,499 - ₹24,999', value: '150-300' },
     { label: 'Over ₹24,999', value: 'over-300' },
   ];
-
-  const filteredProducts = useMemo(() => {
-    let list = [...products];
-
-    // Category filter — category pages always stay on their own products
-    const lockedCategory = categoryFilter && categoryFilter !== 'all' ? categoryFilter : null;
-    const category = lockedCategory || selectedCategory;
-    if (category && category !== 'all') {
-      if (category === 'sale') {
-        list = list.filter((p) => p.isSale || p.price <= 12499);
-      } else if (category === 'women' || isWomenCategory(category)) {
-        list = list.filter((p) => isWomenCategory(p.category));
-      } else if (isHealthBeautyCategory(category)) {
-        list = list.filter((p) => isHealthBeautyCategory(p.category));
-      } else {
-        list = list.filter((p) => p.category === category);
-      }
-    }
-
-    // Size filter
-    if (selectedSize !== 'all') {
-      list = list.filter((p) => p.sizes.some((s) => s.size === selectedSize && s.available));
-    }
-
-    // Color filter
-    if (selectedColor !== 'all') {
-      list = list.filter((p) => p.colors.some((c) => c.name === selectedColor));
-    }
-
-    // Price range filter
-    if (selectedPriceRange === 'under-150') {
-      list = list.filter((p) => p.price < 12499);
-    } else if (selectedPriceRange === '150-300') {
-      list = list.filter((p) => p.price >= 12499 && p.price <= 24999);
-    } else if (selectedPriceRange === 'over-300') {
-      list = list.filter((p) => p.price > 24999);
-    }
-
-    // Sorting
-    if (sortBy === 'newest') {
-      list.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
-    } else if (sortBy === 'price-asc') {
-      list.sort((a, b) => a.price - b.price);
-    } else if (sortBy === 'price-desc') {
-      list.sort((a, b) => b.price - a.price);
-    } else if (sortBy === 'popular') {
-      list.sort((a, b) => {
-        const score = (p: Product) => (p.isNew ? 2 : 0) + (p.isSale ? 1 : 0);
-        return score(b) - score(a);
-      });
-    }
-
-    return list;
-  }, [products, selectedCategory, selectedSize, selectedColor, selectedPriceRange, sortBy, categoryFilter]);
 
   const activeFilterCount =
     (selectedCategory !== 'all' ? 1 : 0) +
@@ -162,11 +167,11 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
     setPage(1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const displayedProducts = filteredProducts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const displayedProducts = pageProducts;
 
-  React.useEffect(() => {
+  useEffect(() => {
     setPage(1);
   }, [selectedCategory, selectedSize, selectedColor, selectedPriceRange, sortBy]);
   const pillClass =
@@ -300,7 +305,23 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
       </div>
 
       {/* Product Grid (2-column layout matching Image 8 with staggered margins) */}
-      {displayedProducts.length === 0 ? (
+      {loading ? (
+        <div className="py-24 text-center">
+          <h3 className="font-serif-luxury text-2xl text-black mb-3">Loading products…</h3>
+          <p className="text-sm text-[#5d5f5f]">Fetching the latest items for this view.</p>
+        </div>
+      ) : loadError ? (
+        <div className="py-24 text-center">
+          <h3 className="font-serif-luxury text-2xl text-black mb-3">Could not load products</h3>
+          <p className="text-sm text-[#5d5f5f] mb-6">{loadError}</p>
+          <button
+            onClick={() => setReloadToken((n) => n + 1)}
+            className="bg-black text-white px-6 py-3 text-xs uppercase tracking-[0.2em] font-semibold"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : displayedProducts.length === 0 ? (
         <div className="py-24 text-center">
           <h3 className="font-serif-luxury text-2xl text-black mb-3">No Products Found</h3>
           <p className="text-sm text-[#5d5f5f] mb-6">
@@ -387,7 +408,7 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
         </div>
       )}
 
-      {filteredProducts.length > PAGE_SIZE && (
+      {totalCount > PAGE_SIZE && (
         <div className="flex flex-wrap items-center justify-center gap-2 mb-24">
           <button
             type="button"
