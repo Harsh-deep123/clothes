@@ -152,7 +152,7 @@ export const NewArrivalsScreen: React.FC<NewArrivalsScreenProps> = ({
   ];
 
   const activeFilterCount =
-    (selectedCategory !== 'all' ? 1 : 0) +
+    (!lockedCategory && selectedCategory !== 'all' ? 1 : 0) +
     (selectedSize !== 'all' ? 1 : 0) +
     (selectedColor !== 'all' ? 1 : 0) +
     (selectedPriceRange !== 'all' ? 1 : 0);

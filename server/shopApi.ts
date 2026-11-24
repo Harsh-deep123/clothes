@@ -197,14 +197,25 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     const page = Number(params.get('page') || 1) || 1;
     const hasLimit = params.has('limit');
     const limit = full && !hasLimit ? 0 : Number(params.get('limit') || (lite ? 48 : 96));
-    const result = await listCatalogProducts({
-      activeOnly,
-      category,
-      page,
-      limit: Number.isFinite(limit) ? limit : 96,
-      lite: lite || !full,
-    });
-    json(res, 200, result);
+    try {
+      const result = await listCatalogProducts({
+        activeOnly,
+        category,
+        page,
+        limit: Number.isFinite(limit) ? limit : 96,
+        lite: lite || !full,
+      });
+      json(res, 200, result);
+    } catch (error) {
+      const status = (error as { status?: number })?.status || 500;
+      json(res, status, {
+        error: error instanceof Error ? error.message : 'Could not load products.',
+        products: [],
+        total: 0,
+        page,
+        limit: Number.isFinite(limit) ? limit : 96,
+      });
+    }
     return;
   }
 

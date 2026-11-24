@@ -35,7 +35,11 @@ async function getDb() {
   if (connecting) return connecting;
   connecting = (async () => {
     try {
-      const next = new import_mongodb.MongoClient(uri, { serverSelectionTimeoutMS: 4e3 });
+      const next = new import_mongodb.MongoClient(uri, {
+        serverSelectionTimeoutMS: 12e3,
+        connectTimeoutMS: 12e3,
+        maxIdleTimeMS: 15e3
+      });
       await next.connect();
       const database = next.db(dbName);
       await database.command({ ping: 1 });
@@ -55,6 +59,7 @@ async function getDb() {
       await database.collection("otp_challenges").createIndex({ email: 1, phone: 1 }, { unique: true });
       await database.collection("otp_challenges").createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 });
       await database.collection("products").createIndex({ id: 1 }, { unique: true });
+      await database.collection("product_images").createIndex({ id: 1 }, { unique: true });
       await database.collection("reviews").createIndex({ id: 1 }, { unique: true });
       await database.collection("reviews").createIndex({ productId: 1, createdAt: -1 });
       try {
@@ -139,7 +144,8 @@ var init_products = __esm({
     STORE_SECTION_CATEGORIES = [
       { slug: "home-decor", name: "Home & Decor" },
       { slug: "auto-electrical", name: "Auto & Electrical Parts" },
-      { slug: "accessories", name: "Accessories" }
+      { slug: "accessories", name: "Accessories" },
+      { slug: "stationery-office", name: "Stationery & Office" }
     ];
     CATEGORIES = [
       {
@@ -221,7 +227,23 @@ var init_products = __esm({
         image: "/images/new-standard-editorial.jpg",
         description: sub.name,
         gridSpan: "md:col-span-1"
-      }))
+      })),
+      {
+        id: "jewellery",
+        name: "Jewellery & Accessories",
+        slug: "jewellery",
+        image: "/images/new-standard-editorial.jpg",
+        description: "Jewellery and accessories",
+        gridSpan: "md:col-span-1"
+      },
+      {
+        id: "kitchen",
+        name: "Kitchen",
+        slug: "kitchen",
+        image: "/images/new-standard-editorial.jpg",
+        description: "Kitchen and cookware",
+        gridSpan: "md:col-span-1"
+      }
     ];
     PRODUCTS = [
       {
@@ -708,18 +730,84 @@ async function handleStripeApi(req, res) {
       const payload = JSON.parse(await readBody(req) || "{}");
       const amount = amountToPaise(Number(payload.amount) || 0);
       if (amount < 50) {
-        json(res, 400, { error: "Order total is too small for card payment." });
+        json(res, 400, { error: "Order total is too small for online payment." });
         return;
       }
-      const intent = await stripe.paymentIntents.create({
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      const itemSummary = items.map((item) => {
+        const row = item;
+        const name = typeof row.name === "string" ? row.name : "Item";
+        const quantity = Number(row.quantity) || 1;
+        return `${name} x${quantity}`;
+      }).join(", ").slice(0, 450);
+      const method2 = payload.method === "upi" ? "upi" : "card";
+      const preferredApp = typeof payload.preferredApp === "string" ? payload.preferredApp : "";
+      const email = typeof payload.email === "string" ? payload.email : "";
+      const intentParams = {
         amount,
         currency: "inr",
-        automatic_payment_methods: { enabled: true },
+        description: itemSummary ? `Zayro Store \u2014 ${itemSummary}` : "Zayro Store order",
+        receipt_email: email || void 0,
         metadata: {
-          customerEmail: typeof payload.email === "string" ? payload.email : ""
+          customerEmail: email,
+          preferredApp,
+          itemCount: String(items.length),
+          items: itemSummary,
+          totalRupees: (amount / 100).toFixed(2),
+          checkoutMethod: method2
         }
-      });
+      };
+      if (method2 === "upi") {
+        intentParams.payment_method_types = ["upi"];
+      } else {
+        intentParams.automatic_payment_methods = { enabled: true };
+      }
+      const intent = await stripe.paymentIntents.create(intentParams);
       json(res, 200, { clientSecret: intent.client_secret, paymentIntentId: intent.id });
+      return;
+    }
+    if (url === "/api/stripe/verify-payment" && method === "POST") {
+      const payload = JSON.parse(await readBody(req) || "{}");
+      const paymentIntentId = typeof payload.paymentIntentId === "string" ? payload.paymentIntentId : "";
+      const expected = Number(payload.amount) || 0;
+      if (!paymentIntentId) {
+        json(res, 400, { error: "Payment is missing." });
+        return;
+      }
+      const stripe = stripeClient();
+      if (!stripe) {
+        json(res, 503, { error: "Stripe is not configured." });
+        return;
+      }
+      const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (intent.status !== "succeeded") {
+        json(res, 200, { paid: false, status: intent.status, paymentIntentId });
+        return;
+      }
+      try {
+        await verifyPaidIntent(paymentIntentId, expected);
+        json(res, 200, { paid: true, status: intent.status, paymentIntentId });
+      } catch (error) {
+        json(res, 400, { paid: false, status: intent.status, error: publicStripeError(error) });
+      }
+      return;
+    }
+    if (url === "/api/stripe/webhook" && method === "POST") {
+      const stripe = stripeClient();
+      const webhookSecret = cleanKey(process.env.STRIPE_WEBHOOK_SECRET || "");
+      if (!stripe || !webhookSecret) {
+        json(res, 503, { error: "Stripe webhook is not configured. Add STRIPE_WEBHOOK_SECRET." });
+        return;
+      }
+      const raw = await readBody(req);
+      const signature = String(req.headers["stripe-signature"] || "");
+      const event = stripe.webhooks.constructEvent(raw, signature, webhookSecret);
+      if (event.type === "payment_intent.succeeded") {
+        const intent = event.data.object;
+        const { confirmPaidOrderByIntent: confirmPaidOrderByIntent2 } = await Promise.resolve().then(() => (init_shopOrders(), shopOrders_exports));
+        await confirmPaidOrderByIntent2(intent.id);
+      }
+      json(res, 200, { received: true });
       return;
     }
     json(res, 404, { error: "Not found" });
@@ -738,6 +826,7 @@ var init_stripeHandler = __esm({
 var shopOrders_exports = {};
 __export(shopOrders_exports, {
   addressLine: () => addressLine,
+  confirmPaidOrderByIntent: () => confirmPaidOrderByIntent,
   createShopOrder: () => createShopOrder,
   getOrderByOrderId: () => getOrderByOrderId,
   listOrdersForUser: () => listOrdersForUser,
@@ -774,6 +863,38 @@ async function seedProductsCollection() {
   }));
   if (docs.length) await collection.insertMany(docs);
 }
+function isOnlineMethod(method, intentId = "") {
+  return ONLINE_METHODS.has(method) || Boolean(intentId);
+}
+function asStored(order) {
+  return withoutMongoId(order);
+}
+async function markOrderPaid(collection, existing, paymentMethod) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const history = [...existing.statusHistory || []];
+  if (!history.some((entry) => entry.status === "Order Confirmed")) {
+    history.push({ status: "Order Confirmed", timestamp: now });
+  }
+  const update = {
+    paymentStatus: "paid",
+    paymentMethod,
+    orderStatus: "Order Confirmed",
+    status: "Order Confirmed",
+    statusHistory: history
+  };
+  await collection.updateOne({ id: existing.id }, { $set: update });
+  return asStored({ ...existing, ...update });
+}
+async function confirmPaidOrderByIntent(paymentIntentId) {
+  const db2 = await getDb();
+  if (!db2 || !paymentIntentId) return null;
+  const collection = db2.collection("orders");
+  const existing = await collection.findOne({ stripePaymentIntentId: paymentIntentId });
+  if (!existing) return null;
+  if (existing.paymentStatus === "paid") return asStored(existing);
+  await verifyPaidIntent(paymentIntentId, Number(existing.total) || 0);
+  return markOrderPaid(collection, existing, existing.paymentMethod || "stripe");
+}
 async function createShopOrder(input) {
   const db2 = await getDb();
   if (!db2) throw new Error("Database is unavailable.");
@@ -784,22 +905,57 @@ async function createShopOrder(input) {
     throw new Error("Complete shipping address is required.");
   }
   if (!input.items.length) throw new Error("Order must include at least one product.");
-  let stripePaymentIntentId = input.stripePaymentIntentId || "";
-  let paymentMethod = input.paymentMethod || "Cash on Delivery";
-  let paymentStatus = input.paymentStatus || "unpaid";
-  if (paymentMethod === "stripe" || stripePaymentIntentId) {
-    if (!stripePaymentIntentId) throw new Error("Stripe payment is required.");
-    await verifyPaidIntent(stripePaymentIntentId, input.total);
-    const existingPaid = await db2.collection("orders").findOne({ stripePaymentIntentId });
-    if (existingPaid) throw new Error("This payment was already used.");
-    paymentMethod = "stripe";
-    paymentStatus = "paid";
-  } else {
-    paymentMethod = "cod";
-    paymentStatus = "unpaid";
-  }
   const collection = db2.collection("orders");
+  const stripePaymentIntentId = input.stripePaymentIntentId || "";
+  let paymentMethod = input.paymentMethod || "cod";
+  const gpayDirect = paymentMethod === "gpay" && !stripePaymentIntentId;
+  const online = isOnlineMethod(paymentMethod, stripePaymentIntentId) && !gpayDirect;
+  const pendingPayment = Boolean(input.pendingPayment || input.paymentStatus === "pending");
+  if (online && !stripePaymentIntentId) {
+    throw new Error("Online payment is required.");
+  }
+  if (gpayDirect) {
+    paymentMethod = "gpay";
+  } else if (online && stripePaymentIntentId) {
+    const existing = await collection.findOne({ stripePaymentIntentId });
+    if (pendingPayment) {
+      if (existing) return asStored(existing);
+    } else {
+      await verifyPaidIntent(stripePaymentIntentId, input.total);
+      if (existing) {
+        if (existing.paymentStatus === "paid") return asStored(existing);
+        return markOrderPaid(collection, existing, paymentMethod);
+      }
+      paymentMethod = ONLINE_METHODS.has(paymentMethod) ? paymentMethod : "stripe";
+    }
+  } else if (!gpayDirect) {
+    paymentMethod = "cod";
+  }
   const createdAt = (/* @__PURE__ */ new Date()).toISOString();
+  const confirmed = gpayDirect || !online || !pendingPayment;
+  const paymentStatus = gpayDirect ? "unpaid" : confirmed ? online ? "paid" : "unpaid" : "pending";
+  const orderStatus = confirmed ? "Order Confirmed" : "Payment Pending";
+  const productIds = [...new Set(input.items.map((item) => item.productId).filter(Boolean))];
+  const catalogRows = productIds.length ? await db2.collection("products").find({ id: { $in: productIds } }).project({ id: 1, sku: 1, name: 1 }).toArray() : [];
+  const skuByProductId = new Map(
+    catalogRows.map((row) => [String(row.id), String(row.sku || "").trim()])
+  );
+  const enrichedItems = input.items.map((item) => {
+    const sku = (item.sku || skuByProductId.get(item.productId) || "").trim();
+    return {
+      productId: item.productId,
+      sku,
+      name: item.name,
+      image: item.image || "",
+      selectedSize: item.selectedSize,
+      selectedColor: item.selectedColor,
+      designId: item.designId || "",
+      designName: item.designName || "",
+      customName: item.customName || "",
+      quantity: item.quantity,
+      price: item.price
+    };
+  });
   let lastError;
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const orderId = generateOrderId();
@@ -815,14 +971,8 @@ async function createShopOrder(input) {
       customerEmail: input.customerEmail.trim().toLowerCase(),
       deliveryAddress: addressLine(input.shippingAddress),
       shipping: input.shippingAddress,
-      items: input.items.map((item) => ({
-        productId: item.productId,
-        name: item.name,
-        image: item.image || "",
-        quantity: item.quantity,
-        price: item.price
-      })),
-      products: input.items,
+      items: enrichedItems,
+      products: enrichedItems,
       subtotal: input.subtotal,
       total: input.total,
       deliveryCharge: input.deliveryCharge,
@@ -830,12 +980,12 @@ async function createShopOrder(input) {
       paymentMethod,
       paymentStatus,
       stripePaymentIntentId: stripePaymentIntentId || void 0,
-      orderStatus: "Order Confirmed",
-      status: "Order Confirmed",
+      orderStatus,
+      status: orderStatus,
       trackingId: "",
       deliveryPartner: "",
       expectedDeliveryDate: "",
-      statusHistory: [{ status: "Order Confirmed", timestamp: createdAt }],
+      statusHistory: [{ status: orderStatus, timestamp: createdAt }],
       confirmationCallSent: false,
       confirmationCallStatus: "pending",
       whatsappMessageSent: false,
@@ -856,6 +1006,18 @@ async function createShopOrder(input) {
     } catch (error) {
       lastError = error;
       const code = error.code;
+      if (code === 11e3 && stripePaymentIntentId) {
+        const existing = await collection.findOne({ stripePaymentIntentId });
+        if (existing) {
+          if (pendingPayment || existing.paymentStatus === "paid") return asStored(existing);
+          if (online && !pendingPayment) {
+            await verifyPaidIntent(stripePaymentIntentId, input.total);
+            return markOrderPaid(collection, existing, paymentMethod);
+          }
+          return asStored(existing);
+        }
+        continue;
+      }
       if (code === 11e3) continue;
       throw error;
     }
@@ -878,6 +1040,7 @@ async function getOrderByOrderId(orderId, userId, email) {
   if (email && order.customerEmail.toLowerCase() === email.toLowerCase()) return order;
   return null;
 }
+var ONLINE_METHODS;
 var init_shopOrders = __esm({
   "server/shopOrders.ts"() {
     init_products();
@@ -886,6 +1049,7 @@ var init_shopOrders = __esm({
     init_orderStore();
     init_mongoCollections();
     init_stripeHandler();
+    ONLINE_METHODS = /* @__PURE__ */ new Set(["stripe", "gpay", "phonepe", "paytm", "upi"]);
   }
 });
 
@@ -1082,6 +1246,213 @@ var init_orderStore = __esm({
     init_mongoCollections();
     STORE_PATH = import_path2.default.resolve(process.cwd(), "data", "orders.json");
     migrated = false;
+  }
+});
+
+// server/productSku.ts
+var productSku_exports = {};
+__export(productSku_exports, {
+  allocateNextProductSku: () => allocateNextProductSku,
+  ensureProductSku: () => ensureProductSku,
+  formatProductSku: () => formatProductSku,
+  parseProductSku: () => parseProductSku,
+  syncProductSkuCounter: () => syncProductSkuCounter
+});
+function formatProductSku(seq) {
+  const n = Math.max(1, Math.floor(Number(seq) || 1));
+  return `${PREFIX}${String(n).padStart(6, "0")}`;
+}
+function parseProductSku(sku) {
+  const raw = String(sku || "").trim().toUpperCase();
+  const match = /^ZY-(\d+)$/.exec(raw);
+  if (!match) return null;
+  const n = Number(match[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+async function allocateNextProductSku(db2) {
+  const counters = db2.collection("counters");
+  const result = await counters.findOneAndUpdate(
+    { _id: COUNTER_ID },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: "after" }
+  );
+  const seq = Number(result?.seq) || 1;
+  return formatProductSku(seq);
+}
+async function ensureProductSku(db2, product) {
+  const existing = parseProductSku(product.sku);
+  if (existing) return formatProductSku(existing);
+  return allocateNextProductSku(db2);
+}
+async function syncProductSkuCounter(db2, maxSeq) {
+  const counters = db2.collection("counters");
+  const current = await counters.findOne({ _id: COUNTER_ID });
+  const seq = Math.max(Number(current?.seq) || 0, Math.max(0, Math.floor(maxSeq)));
+  await counters.updateOne({ _id: COUNTER_ID }, { $set: { seq } }, { upsert: true });
+}
+var COUNTER_ID, PREFIX;
+var init_productSku = __esm({
+  "server/productSku.ts"() {
+    COUNTER_ID = "productSku";
+    PREFIX = "ZY-";
+  }
+});
+
+// src/data/deliveryZones.ts
+var DELIVERY_CONFIG;
+var init_deliveryZones = __esm({
+  "src/data/deliveryZones.ts"() {
+    DELIVERY_CONFIG = {
+      unavailableMessage: "Delivery not available",
+      zones: [
+        {
+          id: "local",
+          label: "Local delivery area",
+          charge: 50,
+          handlingCharge: 5,
+          cities: ["Hoshiarpur"]
+        },
+        {
+          id: "nearby",
+          label: "Nearby area",
+          charge: 50,
+          handlingCharge: 8,
+          states: ["Punjab"]
+        },
+        {
+          id: "india",
+          label: "Other supported areas",
+          charge: 50,
+          handlingCharge: 15,
+          countryCodes: ["IN"],
+          countryNames: ["India"]
+        },
+        {
+          id: "us",
+          label: "United States",
+          charge: 50,
+          handlingCharge: 15,
+          countryCodes: ["US"],
+          countryNames: ["United States"]
+        }
+      ]
+    };
+  }
+});
+
+// server/deliverySettings.ts
+var deliverySettings_exports = {};
+__export(deliverySettings_exports, {
+  bulkMarkupProductPrices: () => bulkMarkupProductPrices,
+  defaultDeliverySettings: () => defaultDeliverySettings,
+  getDeliverySettings: () => getDeliverySettings,
+  saveDeliverySettings: () => saveDeliverySettings
+});
+function defaultDeliverySettings() {
+  return {
+    unavailableMessage: DELIVERY_CONFIG.unavailableMessage,
+    zones: DELIVERY_CONFIG.zones.map((zone) => ({ ...zone }))
+  };
+}
+function normalizeZones(raw) {
+  if (!Array.isArray(raw) || !raw.length) return defaultDeliverySettings().zones;
+  return raw.map((row, index) => {
+    if (!row || typeof row !== "object") return null;
+    const zone = row;
+    const id = typeof zone.id === "string" && zone.id.trim() ? zone.id.trim() : `zone-${index + 1}`;
+    const label = typeof zone.label === "string" && zone.label.trim() ? zone.label.trim() : id;
+    const charge = Math.max(0, Number(zone.charge) || 0);
+    const handlingCharge = Math.max(0, Number(zone.handlingCharge) || 0);
+    return {
+      id,
+      label,
+      charge,
+      handlingCharge,
+      ...Array.isArray(zone.cities) ? { cities: zone.cities.map(String) } : {},
+      ...Array.isArray(zone.states) ? { states: zone.states.map(String) } : {},
+      ...Array.isArray(zone.countryCodes) ? { countryCodes: zone.countryCodes.map(String) } : {},
+      ...Array.isArray(zone.countryNames) ? { countryNames: zone.countryNames.map(String) } : {}
+    };
+  }).filter((zone) => Boolean(zone));
+}
+async function getDeliverySettings() {
+  const db2 = await getDb();
+  if (!db2) return defaultDeliverySettings();
+  const doc = await db2.collection("settings").findOne({ _id: SETTINGS_ID });
+  if (!doc) return defaultDeliverySettings();
+  return {
+    unavailableMessage: typeof doc.unavailableMessage === "string" && doc.unavailableMessage.trim() ? doc.unavailableMessage.trim() : DELIVERY_CONFIG.unavailableMessage,
+    zones: normalizeZones(doc.zones)
+  };
+}
+async function saveDeliverySettings(input) {
+  const db2 = await getDb();
+  if (!db2) throw new Error("Database is unavailable.");
+  const next = {
+    unavailableMessage: typeof input.unavailableMessage === "string" && input.unavailableMessage.trim() ? input.unavailableMessage.trim() : DELIVERY_CONFIG.unavailableMessage,
+    zones: normalizeZones(input.zones)
+  };
+  await db2.collection("settings").updateOne(
+    { _id: SETTINGS_ID },
+    {
+      $set: {
+        ...next,
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      }
+    },
+    { upsert: true }
+  );
+  return next;
+}
+function bump(n, factor) {
+  const value = Number(n);
+  if (!(value > 0)) return value;
+  return Math.max(1, Math.round(value * factor));
+}
+async function bulkMarkupProductPrices(percent) {
+  const db2 = await getDb();
+  if (!db2) throw new Error("Database is unavailable.");
+  const value = Number(percent);
+  if (!Number.isFinite(value) || value === 0) {
+    throw new Error("Enter a non-zero percentage.");
+  }
+  if (value < -90 || value > 500) {
+    throw new Error("Percentage must be between -90 and 500.");
+  }
+  const factor = 1 + value / 100;
+  const col = db2.collection("products");
+  const docs = await col.find({}).toArray();
+  let updated = 0;
+  for (const doc of docs) {
+    const listPrice = bump(doc.listPrice || doc.originalPrice || doc.price, factor);
+    const price = bump(doc.price, factor);
+    const sizes = Array.isArray(doc.sizes) ? doc.sizes.map((s) => ({
+      ...s,
+      ...s.price != null && Number(s.price) > 0 ? { price: bump(s.price, factor) } : {}
+    })) : doc.sizes;
+    await col.updateOne(
+      { _id: doc._id },
+      {
+        $set: {
+          listPrice,
+          price,
+          sizes,
+          updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          priceMarkupPercent: value,
+          priceCutMark: `admin-bulk-${Date.now()}`
+        }
+      }
+    );
+    updated += 1;
+  }
+  return { updated, percent: value, factor };
+}
+var SETTINGS_ID;
+var init_deliverySettings = __esm({
+  "server/deliverySettings.ts"() {
+    init_mongo();
+    init_deliveryZones();
+    SETTINGS_ID = "deliveryCharges";
   }
 });
 
@@ -1757,7 +2128,294 @@ async function resolveReviewAuthor(sessionUserId) {
   return { userId: user.id, userName: user.fullName, email: user.email };
 }
 
+// server/productImages.ts
+var import_crypto2 = require("crypto");
+var import_mongodb2 = require("mongodb");
+init_mongo();
+var MAX_BYTES = 4 * 1024 * 1024;
+function storedProductImageUrl(id) {
+  return `/api/admin/media/${id}`;
+}
+function isStoredProductImageUrl(value) {
+  return /^\/api\/admin\/media\/[0-9a-f-]{36}$/i.test(value.trim());
+}
+function sniffMime(buffer) {
+  if (buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) return "image/jpeg";
+  if (buffer.length >= 8 && buffer[0] === 137 && buffer[1] === 80 && buffer[2] === 78 && buffer[3] === 71) {
+    return "image/png";
+  }
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString() === "RIFF" && buffer.subarray(8, 12).toString() === "WEBP") {
+    return "image/webp";
+  }
+  if (buffer.subarray(0, 6).toString() === "GIF87a" || buffer.subarray(0, 6).toString() === "GIF89a") return "image/gif";
+  if (buffer.length >= 12 && buffer.subarray(4, 8).toString() === "ftyp") {
+    const brand = buffer.subarray(8, 12).toString();
+    if (brand.startsWith("avif") || brand === "avis") return "image/avif";
+  }
+  return null;
+}
+function isPublicHttpUrl(raw) {
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  const host = url.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".local") || host === "0.0.0.0" || host === "::1") return false;
+  if (/^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(host)) return false;
+  return true;
+}
+async function readLimited(response) {
+  const declared = Number(response.headers.get("content-length") || 0);
+  if (declared > MAX_BYTES) return null;
+  const reader = response.body?.getReader();
+  if (!reader) return Buffer.from(await response.arrayBuffer());
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+}
+async function saveProductImageBuffer(buffer, mime) {
+  const db2 = await getDb();
+  if (!db2) return { error: "Database is unavailable.", status: 503 };
+  if (!buffer.length) return { error: "Image file is empty.", status: 400 };
+  if (buffer.length > MAX_BYTES) return { error: "Each photo must be under 4MB.", status: 400 };
+  const id = (0, import_crypto2.randomUUID)();
+  await db2.collection("product_images").insertOne({
+    id,
+    mime,
+    bytes: buffer.length,
+    data: new import_mongodb2.Binary(buffer),
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  });
+  return { url: storedProductImageUrl(id) };
+}
+async function saveProductImageSource(source) {
+  const value = source.trim();
+  if (!value) return { error: "Image is required.", status: 400 };
+  if (isStoredProductImageUrl(value)) return { url: value };
+  const dataUrl = value.match(/^data:(image\/(?:jpeg|jpg|png|webp|gif|avif));base64,([A-Za-z0-9+/=\s]+)$/i);
+  if (dataUrl) {
+    const buffer2 = Buffer.from(dataUrl[2].replace(/\s/g, ""), "base64");
+    const sniffed2 = sniffMime(buffer2);
+    const mime2 = sniffed2 || dataUrl[1].toLowerCase().replace("image/jpg", "image/jpeg");
+    if (!sniffed2 && !mime2.startsWith("image/")) return { error: "Upload a JPEG, PNG, WebP, GIF, or AVIF photo.", status: 400 };
+    return saveProductImageBuffer(buffer2, sniffed2 || mime2);
+  }
+  if (!isPublicHttpUrl(value)) return { error: "Paste a public image URL or upload a photo.", status: 400 };
+  let response;
+  try {
+    response = await fetch(value, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(15e3),
+      headers: {
+        Accept: "image/avif,image/webp,image/png,image/jpeg,image/*,*/*",
+        "User-Agent": "ZayroCollection/1.0"
+      }
+    });
+  } catch {
+    return { error: "Could not download that image.", status: 400 };
+  }
+  if (!response.ok) return { error: "Could not download that image.", status: 400 };
+  const buffer = await readLimited(response);
+  if (!buffer) return { error: "Each photo must be under 4MB.", status: 400 };
+  const sniffed = sniffMime(buffer);
+  const headerMime = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  const mime = sniffed || (headerMime.startsWith("image/") ? headerMime : "");
+  if (!mime) return { error: "That link is not an image file.", status: 400 };
+  return saveProductImageBuffer(buffer, mime);
+}
+function bytesFromStored(data) {
+  if (!data) return null;
+  if (Buffer.isBuffer(data)) return data;
+  if (data instanceof import_mongodb2.Binary) return Buffer.from(data.value());
+  if (data instanceof Uint8Array) return Buffer.from(data);
+  return null;
+}
+async function readProductImage(id) {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const db2 = await getDb();
+  if (!db2) return null;
+  const doc = await db2.collection("product_images").findOne({ id });
+  if (!doc) return null;
+  const data = bytesFromStored(doc.data);
+  if (!data) return null;
+  const mime = typeof doc.mime === "string" && doc.mime.startsWith("image/") ? doc.mime : "image/jpeg";
+  return { data, mime };
+}
+async function keepImage(value) {
+  const source = typeof value === "string" ? value.trim() : "";
+  if (!source) return "";
+  if (isStoredProductImageUrl(source)) return source;
+  if (source.startsWith("data:") || /^https?:\/\//i.test(source)) {
+    const saved = await saveProductImageSource(source);
+    if ("error" in saved) throw new Error(saved.error);
+    return saved.url;
+  }
+  return source;
+}
+function buildCategoryFilter(category) {
+  const slug = (category || "").trim();
+  if (!slug || slug === "all") return {};
+  if (slug === "sale") {
+    return {
+      $or: [{ isSale: true }, { saleEnabled: true }, { price: { $lte: 12499 } }]
+    };
+  }
+  if (slug === "women") {
+    return { category: { $regex: /^women($|-)/i } };
+  }
+  if (slug === "health-beauty") {
+    return { category: { $regex: /^(health-beauty|beauty-)/i } };
+  }
+  return { category: slug };
+}
+function toLiteProduct(row) {
+  const images = Array.isArray(row.images) ? row.images.filter((url) => typeof url === "string" && Boolean(url)).slice(0, 2) : [];
+  const colors = Array.isArray(row.colors) ? row.colors.slice(0, 8).map((color) => {
+    if (!color || typeof color !== "object") return color;
+    const entry = color;
+    const colorImages = Array.isArray(entry.images) ? entry.images.filter((url) => typeof url === "string" && Boolean(url)).slice(0, 1) : [];
+    return {
+      name: entry.name,
+      value: entry.value,
+      images: colorImages
+    };
+  }) : row.colors;
+  return {
+    id: row.id,
+    sku: row.sku,
+    name: row.name,
+    subtitle: row.subtitle,
+    price: row.price,
+    listPrice: row.listPrice,
+    originalPrice: row.originalPrice,
+    category: row.category,
+    categoryLabel: row.categoryLabel,
+    breadcrumb: row.breadcrumb,
+    images,
+    colors,
+    sizes: row.sizes,
+    designs: Array.isArray(row.designs) ? row.designs.slice(0, 4) : row.designs,
+    description: typeof row.description === "string" ? row.description.slice(0, 280) : row.description,
+    detailsAndCare: Array.isArray(row.detailsAndCare) ? row.detailsAndCare.slice(0, 4) : [],
+    shippingAndReturns: typeof row.shippingAndReturns === "string" ? row.shippingAndReturns.slice(0, 160) : "",
+    isNew: row.isNew,
+    isSale: row.isSale,
+    stock: row.stock,
+    active: row.active,
+    hasSizes: row.hasSizes,
+    hasColors: row.hasColors,
+    discountEnabled: row.discountEnabled,
+    discountType: row.discountType,
+    discountValue: row.discountValue,
+    saleEnabled: row.saleEnabled,
+    saleStart: row.saleStart,
+    saleEnd: row.saleEnd
+  };
+}
+async function listCatalogProducts(options) {
+  const db2 = await getDb();
+  if (!db2) {
+    const err = new Error("Database is unavailable.");
+    err.status = 503;
+    throw err;
+  }
+  const filter = {
+    ...options?.activeOnly ? { active: { $ne: false } } : {},
+    ...buildCategoryFilter(options?.category)
+  };
+  const page = Math.max(1, Number(options?.page) || 1);
+  const rawLimit = Number(options?.limit);
+  const unlimited = !Number.isFinite(rawLimit) || rawLimit <= 0;
+  const limit = unlimited ? 0 : Math.min(200, Math.max(1, Math.floor(rawLimit)));
+  const collection = db2.collection("products");
+  const total = await collection.countDocuments(filter);
+  let cursor = collection.find(filter).project({
+    _id: 0,
+    averageRating: 0,
+    totalReviews: 0,
+    purchasedFrom: 0
+  });
+  if (!unlimited) {
+    cursor = cursor.skip((page - 1) * limit).limit(limit);
+  }
+  const docs = await cursor.toArray();
+  const products = docs.filter((row) => typeof row.id === "string" && Boolean(row.id.trim())).map((row) => options?.lite ? toLiteProduct(row) : row);
+  return { products, total, page, limit: unlimited ? total : limit };
+}
+async function getCatalogProductById(id) {
+  const db2 = await getDb();
+  if (!db2) return null;
+  const productId = id.trim();
+  if (!productId) return null;
+  const doc = await db2.collection("products").findOne(
+    { id: productId },
+    { projection: { _id: 0, averageRating: 0, totalReviews: 0, purchasedFrom: 0 } }
+  );
+  if (!doc || typeof doc.id !== "string") return null;
+  return doc;
+}
+async function deleteCatalogProduct(id) {
+  const db2 = await getDb();
+  if (!db2) return { error: "Database is unavailable.", status: 503 };
+  const productId = id.trim();
+  if (!productId) return { error: "Product id is required.", status: 400 };
+  await db2.collection("products").deleteOne({ id: productId });
+  return { ok: true };
+}
+async function saveCatalogProduct(raw) {
+  const db2 = await getDb();
+  if (!db2) return { error: "Database is unavailable.", status: 503 };
+  const id = typeof raw.id === "string" ? raw.id.trim() : "";
+  if (!id) return { error: "Product id is required.", status: 400 };
+  const images = Array.isArray(raw.images) ? await Promise.all(raw.images.map((item) => keepImage(item))) : [];
+  const colors = Array.isArray(raw.colors) ? await Promise.all(
+    raw.colors.map(async (color) => {
+      if (!color || typeof color !== "object") return color;
+      const row = color;
+      if (!Array.isArray(row.images)) return row;
+      return { ...row, images: (await Promise.all(row.images.map((item) => keepImage(item)))).filter(Boolean) };
+    })
+  ) : raw.colors;
+  const designs = Array.isArray(raw.designs) ? await Promise.all(
+    raw.designs.map(async (design) => {
+      if (!design || typeof design !== "object") return design;
+      const row = design;
+      return { ...row, image: await keepImage(row.image) };
+    })
+  ) : raw.designs;
+  const existing = await db2.collection("products").findOne({ id }, { projection: { sku: 1 } });
+  const { ensureProductSku: ensureProductSku2 } = await Promise.resolve().then(() => (init_productSku(), productSku_exports));
+  const sku = await ensureProductSku2(db2, {
+    sku: typeof raw.sku === "string" && raw.sku.trim() ? raw.sku : existing?.sku
+  });
+  const product = {
+    ...raw,
+    id,
+    sku,
+    images: images.filter(Boolean),
+    colors,
+    designs,
+    updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  await db2.collection("products").updateOne({ id }, { $set: product }, { upsert: true });
+  return { product };
+}
+
 // server/adminOrderApi.ts
+init_deliverySettings();
 function json2(res, status, body) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
@@ -1797,6 +2455,67 @@ async function handleAdminOrderApi(req, res) {
   try {
     const url = (req.url || "").split("?")[0];
     const method = (req.method || "GET").toUpperCase();
+    const mediaFile = url.match(/^\/api\/admin\/media\/([^/]+)$/);
+    if (mediaFile && method === "GET") {
+      const file = await readProductImage(decodeURIComponent(mediaFile[1]));
+      if (!file) {
+        json2(res, 404, { error: "Image not found." });
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader("Content-Type", file.mime);
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.end(file.data);
+      return;
+    }
+    if (url === "/api/admin/media" && method === "POST") {
+      if (!requireAdmin(req)) {
+        json2(res, 401, { error: "Admin sign in required." });
+        return;
+      }
+      const payload = JSON.parse(await readBody2(req) || "{}");
+      const source = str(payload.dataUrl) || str(payload.sourceUrl);
+      const saved = await saveProductImageSource(source);
+      if ("error" in saved) {
+        json2(res, saved.status, { error: saved.error });
+        return;
+      }
+      json2(res, 201, saved);
+      return;
+    }
+    if (url === "/api/admin/products" && method === "PUT") {
+      if (!requireAdmin(req)) {
+        json2(res, 401, { error: "Admin sign in required." });
+        return;
+      }
+      const payload = JSON.parse(await readBody2(req) || "{}");
+      try {
+        const saved = await saveCatalogProduct(payload);
+        if ("error" in saved) {
+          json2(res, saved.status, { error: saved.error });
+          return;
+        }
+        json2(res, 200, saved);
+      } catch (error) {
+        json2(res, 400, { error: error instanceof Error ? error.message : "Could not save the product images." });
+      }
+      return;
+    }
+    const deleteProduct = url.match(/^\/api\/admin\/products\/([^/]+)$/);
+    if (deleteProduct && method === "DELETE") {
+      if (!requireAdmin(req)) {
+        json2(res, 401, { error: "Admin sign in required." });
+        return;
+      }
+      const deleted = await deleteCatalogProduct(decodeURIComponent(deleteProduct[1]));
+      if ("error" in deleted) {
+        json2(res, deleted.status, { error: deleted.error });
+        return;
+      }
+      json2(res, 200, deleted);
+      return;
+    }
     if (url === "/api/admin/login" && method === "POST") {
       const payload = JSON.parse(await readBody2(req) || "{}");
       const email = str(payload.email).toLowerCase();
@@ -1967,6 +2686,41 @@ async function handleAdminOrderApi(req, res) {
         expectedDeliveryDate: typeof payload.expectedDeliveryDate === "string" ? str(payload.expectedDeliveryDate) : void 0
       });
       json2(res, 200, { order: updated });
+      return;
+    }
+    if (url === "/api/admin/delivery-charges" && method === "GET") {
+      if (!requireAdmin(req)) {
+        json2(res, 401, { error: "Admin sign in required." });
+        return;
+      }
+      json2(res, 200, { settings: await getDeliverySettings() });
+      return;
+    }
+    if (url === "/api/admin/delivery-charges" && method === "PUT") {
+      if (!requireAdmin(req)) {
+        json2(res, 401, { error: "Admin sign in required." });
+        return;
+      }
+      const payload = JSON.parse(await readBody2(req) || "{}");
+      const settings = await saveDeliverySettings({
+        unavailableMessage: typeof payload.unavailableMessage === "string" ? payload.unavailableMessage : void 0,
+        zones: payload.zones
+      });
+      json2(res, 200, { settings });
+      return;
+    }
+    if (url === "/api/admin/prices/bulk-markup" && method === "POST") {
+      if (!requireAdmin(req)) {
+        json2(res, 401, { error: "Admin sign in required." });
+        return;
+      }
+      const payload = JSON.parse(await readBody2(req) || "{}");
+      try {
+        const result = await bulkMarkupProductPrices(Number(payload.percent));
+        json2(res, 200, result);
+      } catch (error) {
+        json2(res, 400, { error: error instanceof Error ? error.message : "Could not update prices." });
+      }
       return;
     }
     json2(res, 404, { error: "Not found" });
@@ -2159,6 +2913,28 @@ async function handleChatApi(req, res) {
 init_orderStore();
 
 // server/orderMessage.ts
+function selectedSizeLabel(size) {
+  const value = (size || "").trim();
+  if (!value || /^one[\s-]?size$/i.test(value)) return "";
+  return value;
+}
+function designLine(item) {
+  if (!item.designName && !item.designId) return "";
+  const name = item.designName || "Selected design";
+  return item.designId ? `
+Design: ${name} (${item.designId})` : `
+Design: ${name}`;
+}
+function sizeLine(item) {
+  const size = selectedSizeLabel(item.selectedSize);
+  return size ? `
+Size: ${size}` : "";
+}
+function nameLine(item) {
+  const name = (item.customName || "").trim();
+  return name ? `
+Name: ${name}` : "";
+}
 function formatInr(value) {
   return `\u20B9${(Number(value) || 0).toLocaleString("en-IN", {
     minimumFractionDigits: 2,
@@ -2172,7 +2948,7 @@ function formatAddress(address) {
 function formatWhatsAppOrderMessage(input) {
   const name = input.customerName.trim() || "Customer";
   const products = (input.items.length ? input.items : [{ name: "Your items", quantity: 1, price: input.total }]).map(
-    (item) => `Product Name: ${item.name}
+    (item) => `Product Name: ${item.name}${designLine(item)}${sizeLine(item)}${nameLine(item)}
 Quantity: ${item.quantity}
 Price: ${formatInr(item.price)}`
   ).join("\n\n");
@@ -2203,7 +2979,12 @@ function spokenOrderScript(input) {
   const name = input.customerName.trim() || "customer";
   const products = (input.items.length ? input.items : []).map((item) => {
     const line = (Number(item.price) || 0) * (Number(item.quantity) || 1);
-    return `${item.name}, quantity ${item.quantity}, price ${line.toLocaleString("en-IN")} rupees`;
+    const design = item.designName ? `, design ${item.designName}` : "";
+    const size = selectedSizeLabel(item.selectedSize);
+    const sizeSpeech = size ? `, size ${size}` : "";
+    const printed = (item.customName || "").trim();
+    const nameSpeech = printed ? `, name ${printed}` : "";
+    return `${item.name}${design}${sizeSpeech}${nameSpeech}, quantity ${item.quantity}, price ${line.toLocaleString("en-IN")} rupees`;
   });
   const productSpeech = products.length ? ` You ordered: ${products.join(". ")}.` : "";
   return `Hello ${name}, thank you for shopping with ZAYRO Store. Your order number ${input.number} has been successfully received.${productSpeech} Your order total is ${(Number(input.total) || 0).toLocaleString("en-IN")} rupees. We will process your order soon. Thank you for choosing ZAYRO Store.`;
@@ -2273,7 +3054,7 @@ async function sendCustomerOrderEmail(order) {
     address: order.deliveryAddress || "\u2014"
   });
   const productRows = (order.items || []).map(
-    (item) => `<tr><td style="padding:8px;border:1px solid #ddd">${item.name}</td><td style="padding:8px;border:1px solid #ddd">${item.quantity}</td><td style="padding:8px;border:1px solid #ddd">${formatInr(item.price)}</td></tr>`
+    (item) => `<tr><td style="padding:8px;border:1px solid #ddd">${item.name}${item.designName ? ` \u2014 ${item.designName}${item.designId ? ` (${item.designId})` : ""}` : ""}${item.selectedSize && !/^one[\s-]?size$/i.test(item.selectedSize) ? ` \u2014 Size ${item.selectedSize}` : ""}${item.customName ? ` \u2014 Name ${item.customName}` : ""}</td><td style="padding:8px;border:1px solid #ddd">${item.quantity}</td><td style="padding:8px;border:1px solid #ddd">${formatInr(item.price)}</td></tr>`
   ).join("");
   const port = Number(process.env.SMTP_PORT || 587);
   const transporter = import_nodemailer.default.createTransport({
@@ -2479,7 +3260,19 @@ function baseRecord(input, existing) {
     customerPhoneE164: e164,
     customerEmail: input.customerEmail || existing?.customerEmail || "",
     deliveryAddress: formatAddress(input.shippingAddress) || existing?.deliveryAddress || "",
-    items: input.items?.length ? input.items : existing?.items || [],
+    items: input.items?.length ? input.items.map((item, index) => {
+      const previous = existing?.items?.[index];
+      return {
+        ...previous,
+        ...item,
+        image: previous?.image || "",
+        productId: previous?.productId,
+        designId: item.designId || previous?.designId || "",
+        designName: item.designName || previous?.designName || "",
+        selectedSize: item.selectedSize || previous?.selectedSize || "",
+        customName: item.customName || previous?.customName || ""
+      };
+    }) : existing?.items || [],
     total: input.total,
     confirmationCallSent: existing?.confirmationCallSent || false,
     confirmationCallStatus: existing?.confirmationCallStatus || "pending",
@@ -3351,7 +4144,7 @@ async function handleReviewApi(req, res) {
 init_shopOrders();
 
 // server/otpStore.ts
-var import_crypto2 = require("crypto");
+var import_crypto3 = require("crypto");
 var import_bcryptjs2 = __toESM(require("bcryptjs"), 1);
 init_mongo();
 
@@ -3391,7 +4184,7 @@ var OTP_TTL_MS = 5 * 60 * 1e3;
 var MAX_ATTEMPTS = 5;
 var RESEND_COOLDOWN_MS = 60 * 1e3;
 function generateOtp() {
-  return String((0, import_crypto2.randomInt)(0, 1e6)).padStart(6, "0");
+  return String((0, import_crypto3.randomInt)(0, 1e6)).padStart(6, "0");
 }
 async function challenges() {
   const db2 = await getDb();
@@ -3432,7 +4225,7 @@ async function sendRegistrationOtp(input) {
   const otpHash = await import_bcryptjs2.default.hash(otp, 10);
   const passwordHash = await import_bcryptjs2.default.hash(input.password, 10);
   const expiresAt = new Date(now + OTP_TTL_MS);
-  const id = current?.id || (0, import_crypto2.randomUUID)();
+  const id = current?.id || (0, import_crypto3.randomUUID)();
   const sms = await sendTwilioSms(phone, `Your ZAYRO Store verification code is ${otp}. It expires in 5 minutes.`);
   if (sms.ok === false) return { error: sms.error, status: 502 };
   const doc = {
@@ -3643,6 +4436,52 @@ async function handleInner2(req, res) {
     json7(res, 200, { user });
     return;
   }
+  if (url.startsWith("/api/shop/products/") && method === "GET") {
+    const productId = decodeURIComponent(url.slice("/api/shop/products/".length).split("?")[0] || "");
+    const product = await getCatalogProductById(productId);
+    if (!product) {
+      json7(res, 404, { error: "Product not found." });
+      return;
+    }
+    json7(res, 200, { product });
+    return;
+  }
+  if (url === "/api/shop/products" && method === "GET") {
+    const query = (req.url || "").includes("?") ? (req.url || "").split("?")[1] : "";
+    const params = new URLSearchParams(query);
+    const activeOnly = params.get("all") !== "1";
+    const lite = params.get("lite") === "1";
+    const full = params.get("full") === "1";
+    const category = params.get("category") || void 0;
+    const page = Number(params.get("page") || 1) || 1;
+    const hasLimit = params.has("limit");
+    const limit = full && !hasLimit ? 0 : Number(params.get("limit") || (lite ? 48 : 96));
+    try {
+      const result = await listCatalogProducts({
+        activeOnly,
+        category,
+        page,
+        limit: Number.isFinite(limit) ? limit : 96,
+        lite: lite || !full
+      });
+      json7(res, 200, result);
+    } catch (error) {
+      const status = error?.status || 500;
+      json7(res, status, {
+        error: error instanceof Error ? error.message : "Could not load products.",
+        products: [],
+        total: 0,
+        page,
+        limit: Number.isFinite(limit) ? limit : 96
+      });
+    }
+    return;
+  }
+  if (url === "/api/shop/delivery-config" && method === "GET") {
+    const { getDeliverySettings: getDeliverySettings2 } = await Promise.resolve().then(() => (init_deliverySettings(), deliverySettings_exports));
+    json7(res, 200, { settings: await getDeliverySettings2() });
+    return;
+  }
   if (url === "/api/shop/orders" && method === "POST") {
     const payload = JSON.parse(await readBody7(req) || "{}");
     const session = authUser(req);
@@ -3670,6 +4509,9 @@ async function handleInner2(req, res) {
           image: str5(row.image) || void 0,
           selectedSize: str5(row.selectedSize) || void 0,
           selectedColor: str5(row.selectedColor) || void 0,
+          designId: str5(row.designId) || void 0,
+          designName: str5(row.designName) || void 0,
+          customName: str5(row.customName) || void 0,
           quantity: Number(row.quantity) || 1,
           price: Number(row.price) || 0
         };
@@ -3682,6 +4524,7 @@ async function handleInner2(req, res) {
       paymentMethod: str5(payload.paymentMethod) || "cod",
       paymentStatus: str5(payload.paymentStatus) || "unpaid",
       stripePaymentIntentId: str5(payload.stripePaymentIntentId) || void 0,
+      pendingPayment: payload.pendingPayment === true || str5(payload.paymentStatus) === "pending",
       deliveryLocation: normalizeDeliveryLocation(payload.deliveryLocation, deliveryAddressLine)
     });
     json7(res, 201, { order });

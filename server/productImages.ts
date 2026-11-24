@@ -226,7 +226,11 @@ function toLiteProduct(row: Record<string, unknown>) {
 
 export async function listCatalogProducts(options?: ListCatalogOptions) {
   const db = await getDb();
-  if (!db) return { products: [] as Record<string, unknown>[], total: 0, page: 1, limit: 0 };
+  if (!db) {
+    const err = new Error('Database is unavailable.');
+    (err as Error & { status?: number }).status = 503;
+    throw err;
+  }
   const filter: Record<string, unknown> = {
     ...(options?.activeOnly ? { active: { $ne: false } } : {}),
     ...buildCategoryFilter(options?.category),

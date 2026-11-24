@@ -17,7 +17,11 @@ export async function getDb(): Promise<Db | null> {
 
   connecting = (async () => {
     try {
-      const next = new MongoClient(uri, { serverSelectionTimeoutMS: 4000 });
+      const next = new MongoClient(uri, {
+        serverSelectionTimeoutMS: 12000,
+        connectTimeoutMS: 12000,
+        maxIdleTimeMS: 15000,
+      });
       await next.connect();
       const database = next.db(dbName);
       await database.command({ ping: 1 });

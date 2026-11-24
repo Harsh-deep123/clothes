@@ -385,6 +385,9 @@ export async function fetchStorefrontCatalogPage(
     error?: string;
   };
   if (!response.ok) throw new Error(data.error || 'Could not load products.');
+  if (typeof data.error === 'string' && data.error.trim() && !Array.isArray(data.products)) {
+    throw new Error(data.error);
+  }
   const remote = Array.isArray(data.products)
     ? data.products
         .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
