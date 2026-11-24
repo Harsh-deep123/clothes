@@ -1,5 +1,5 @@
 import * as esbuild from 'esbuild';
-import { mkdirSync } from 'fs';
+import { cpSync, existsSync, mkdirSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -27,5 +27,14 @@ await esbuild.build({
     'dotenv',
   ],
 });
+
+// Keep a copy next to the serverless entry so fallback catalog is always readable on Vercel.
+const catalogSrc = path.join(root, 'server', 'data');
+const catalogDest = path.join(root, 'api', 'data');
+if (existsSync(catalogSrc)) {
+  mkdirSync(catalogDest, { recursive: true });
+  cpSync(catalogSrc, catalogDest, { recursive: true });
+  console.log('Copied catalog fallback -> api/data');
+}
 
 console.log('Bundled Vercel API -> api/index.js');

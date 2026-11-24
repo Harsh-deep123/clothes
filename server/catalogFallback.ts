@@ -11,7 +11,25 @@ let cachedAll: Record<string, unknown>[] | null = null;
 const cachedCategory = new Map<string, Record<string, unknown>[]>();
 
 function dataDirs() {
-  return [path.join(process.cwd(), 'server', 'data'), path.join(process.cwd(), 'data')];
+  const cwd = process.cwd();
+  const dirs = [
+    path.join(cwd, 'api', 'data'),
+    path.join(cwd, 'server', 'data'),
+    path.join(cwd, 'data'),
+  ];
+  // __dirname is rewritten by the CJS Vercel bundle to the api/ folder.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dirname = typeof __dirname !== 'undefined' ? __dirname : '';
+    if (dirname) {
+      dirs.unshift(path.join(dirname, 'data'));
+      dirs.push(path.join(dirname, 'server', 'data'));
+      dirs.push(path.join(dirname, '..', 'server', 'data'));
+    }
+  } catch {
+    /* ignore */
+  }
+  return dirs;
 }
 
 function resolveDataFile(...parts: string[]) {
@@ -72,7 +90,7 @@ function loadCategoryProducts(category?: string): Record<string, unknown>[] {
 }
 
 export function fallbackCatalogAvailable() {
-  return Boolean(resolveDataFile('catalog-lite.json'));
+  return Boolean(resolveDataFile('catalog-lite.json') || resolveDataFile('catalog', 'kitchen.json'));
 }
 
 export function listFallbackCatalogProducts(options?: {

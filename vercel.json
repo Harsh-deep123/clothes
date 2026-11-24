@@ -8,8 +8,8 @@
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": "server/**/*",
-      "maxDuration": 30,
+      "includeFiles": "{api/data/**,server/data/**,server/**/*}",
+      "maxDuration": 60,
       "memory": 1024
     }
   }

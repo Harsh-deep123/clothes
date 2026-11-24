@@ -1257,7 +1257,22 @@ __export(catalogFallback_exports, {
   listFallbackCatalogProducts: () => listFallbackCatalogProducts
 });
 function dataDirs() {
-  return [import_path4.default.join(process.cwd(), "server", "data"), import_path4.default.join(process.cwd(), "data")];
+  const cwd = process.cwd();
+  const dirs = [
+    import_path4.default.join(cwd, "api", "data"),
+    import_path4.default.join(cwd, "server", "data"),
+    import_path4.default.join(cwd, "data")
+  ];
+  try {
+    const dirname = typeof __dirname !== "undefined" ? __dirname : "";
+    if (dirname) {
+      dirs.unshift(import_path4.default.join(dirname, "data"));
+      dirs.push(import_path4.default.join(dirname, "server", "data"));
+      dirs.push(import_path4.default.join(dirname, "..", "server", "data"));
+    }
+  } catch {
+  }
+  return dirs;
 }
 function resolveDataFile(...parts) {
   for (const dir of dataDirs()) {
@@ -1305,7 +1320,7 @@ function loadCategoryProducts(category) {
   return rows;
 }
 function fallbackCatalogAvailable() {
-  return Boolean(resolveDataFile("catalog-lite.json"));
+  return Boolean(resolveDataFile("catalog-lite.json") || resolveDataFile("catalog", "kitchen.json"));
 }
 function listFallbackCatalogProducts(options) {
   const page = Math.max(1, Number(options?.page) || 1);
